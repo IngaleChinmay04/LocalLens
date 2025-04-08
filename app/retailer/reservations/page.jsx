@@ -1,14 +1,16 @@
 "use client";
 
 import { useAuth } from "@/lib/context/AuthContext";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
-import RetailerDashboard from "@/components/dashboard/RetailerDashboard";
 import RetailerLayout from "@/components/layouts/RetailerLayout";
+import ReservationManagement from "@/components/retailers/ReservationManagement";
 
-export default function RetailerPage() {
+export default function ReservationsPage() {
   const { user, mongoUser, loading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const shopId = searchParams.get("shopId");
 
   useEffect(() => {
     if (!loading && (!user || (mongoUser && mongoUser.role !== "retailer"))) {
@@ -42,7 +44,7 @@ export default function RetailerPage() {
 
   return (
     <RetailerLayout>
-      <RetailerDashboard />
+      <ReservationManagement shopId={shopId} />
     </RetailerLayout>
   );
 }

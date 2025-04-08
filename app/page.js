@@ -214,8 +214,8 @@ export default function CustomerDashboard() {
                 Shop Unique Products
               </h3>
               <p className="text-gray-600">
-                Access unique and handcrafted items that you won't find in big
-                chain stores.
+                Access unique and handcrafted items that you &#39;won&#39;t find
+                in big chain stores.
               </p>
             </div>
 

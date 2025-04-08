@@ -3,10 +3,10 @@
 import { useAuth } from "@/lib/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import RetailerDashboard from "@/components/dashboard/RetailerDashboard";
 import RetailerLayout from "@/components/layouts/RetailerLayout";
+import ShopRegistrationForm from "@/components/retailers/ShopRegistrationForm";
 
-export default function RetailerPage() {
+export default function NewShopPage() {
   const { user, mongoUser, loading } = useAuth();
   const router = useRouter();
 
@@ -42,7 +42,13 @@ export default function RetailerPage() {
 
   return (
     <RetailerLayout>
-      <RetailerDashboard />
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold">Register a New Shop</h1>
+        <p className="text-gray-600">
+          Fill in the details to set up your shop on LocalLens
+        </p>
+      </div>
+      <ShopRegistrationForm />
     </RetailerLayout>
   );
 }
