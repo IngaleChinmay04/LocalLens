@@ -1,21 +1,18 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import Shop from "@/models/Shop.model";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { withFirebaseAuth } from "@/middleware/firebase-auth";
 
 export async function GET(request) {
+  return withFirebaseAuth(request, handleGetRequest, ["retailer", "admin"]);
+}
+
+async function handleGetRequest(request, user) {
   try {
     await dbConnect();
 
-    // Get user session
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Get the user ID from the session
-    const userId = session.user.id;
+    // Get the user ID directly from the user object provided by middleware
+    const userId = user._id;
 
     // Fetch pending and rejected shops for this user
     const pendingShops = await Shop.find({

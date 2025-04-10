@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 
 export default function ShopStatusBanner() {
-  const { mongoUser } = useAuth();
+  const { mongoUser, getIdToken } = useAuth();
   const [pendingShops, setPendingShops] = useState([]);
   const [rejectedShops, setRejectedShops] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -20,7 +20,19 @@ export default function ShopStatusBanner() {
   useEffect(() => {
     async function fetchShopStatus() {
       try {
-        const response = await fetch("/api/retailers/shops/status");
+        // Get Firebase token
+        const token = await getIdToken();
+
+        if (!token) {
+          console.error("No authentication token available");
+          return;
+        }
+
+        const response = await fetch("/api/retailers/shops/status", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
         if (!response.ok) {
           throw new Error("Failed to fetch shop status");

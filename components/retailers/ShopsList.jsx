@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
+// import { useSession } from "next-auth/react";
 import {
   CheckCircle,
   Clock,
@@ -14,23 +15,52 @@ import {
   ShoppingBag,
   AlertCircle,
 } from "lucide-react";
+import { useAuth } from "@/lib/context/AuthContext";
 
 export default function ShopsList() {
   const [shops, setShops] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+  // const { data: session } = useSession();
+  // Inside your component:
+  const { user, getIdToken } = useAuth();
 
   useEffect(() => {
     async function fetchShops() {
       try {
-        const response = await fetch("/api/retailers/shops");
+        setIsLoading(true);
+
+        // Get Firebase token
+        const token = await getIdToken();
+
+        if (!token) {
+          throw new Error("Authentication token not available");
+        }
+
+        const response = await fetch("/api/retailers/shops", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
         if (!response.ok) {
           throw new Error("Failed to fetch shops");
         }
 
         const data = await response.json();
-        setShops(data);
+        console.log("Shops data:", data);
+        // setShops(data);
+        // Check if data is an array, or extract the array from the response
+        if (Array.isArray(data)) {
+          setShops(data);
+        } else if (data && typeof data === "object") {
+          // If data is an object, try to find an array property (common patterns)
+          // Adjust the property name based on your API response structure
+          setShops(data.shops || data.data || data.results || []);
+        } else {
+          // Fallback to empty array if data is not valid
+          setShops([]);
+        }
       } catch (error) {
         toast.error(error.message || "An error occurred while fetching shops");
         console.error("Error fetching shops:", error);
@@ -39,8 +69,10 @@ export default function ShopsList() {
       }
     }
 
-    fetchShops();
-  }, []);
+    if (user) {
+      fetchShops();
+    }
+  }, [user]);
 
   const getStatusBadge = (status) => {
     switch (status) {

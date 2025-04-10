@@ -7,7 +7,10 @@ export async function GET(req, { params }) {
   try {
     await dbConnect();
 
-    const email = decodeURIComponent(params.email);
+    // Await params before accessing its properties
+    const paramsResolved = await params;
+    const email = decodeURIComponent(paramsResolved.email);
+
     const user = await User.findOne({ email }).select("-__v");
 
     if (!user) {
@@ -29,7 +32,10 @@ export async function PUT(req, { params }) {
   try {
     await dbConnect();
 
-    const email = decodeURIComponent(params.email);
+    // Await params before accessing its properties
+    const paramsResolved = await params;
+    const email = decodeURIComponent(paramsResolved.email);
+
     const user = await User.findOneAndUpdate(
       { email },
       { $set: { lastLogin: new Date() } },

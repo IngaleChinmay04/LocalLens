@@ -19,6 +19,7 @@ const ShopSchema = new mongoose.Schema(
     },
     logo: {
       type: String, // URL to the logo image in Cloudinary
+      default: null,
     },
     coverImages: [
       {

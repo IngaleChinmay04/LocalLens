@@ -4,10 +4,11 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
 import { toast } from "react-hot-toast";
+import { uploadToCloudinaryViaAPI } from "@/lib/cloudinaryClient";
 
 export default function ShopRegistrationForm() {
   const router = useRouter();
-  const { mongoUser, user } = useAuth();
+  const { mongoUser, user, getIdToken } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
@@ -59,12 +60,30 @@ export default function ShopRegistrationForm() {
   };
 
   // Handle file inputs
+  // Add this validation to your handleFileChange function
   const handleFileChange = (e) => {
     const { name, files } = e.target;
     if (files && files.length > 0) {
+      const file = files[0];
+
+      // Check file size - 10MB limit in bytes
+      const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error(
+          `File too large. Maximum size is 10MB. Your file is ${(
+            file.size /
+            (1024 * 1024)
+          ).toFixed(2)}MB.`
+        );
+        // Reset the file input
+        e.target.value = "";
+        return;
+      }
+
       setFormData({
         ...formData,
-        [name]: files[0],
+        [name]: file,
       });
     }
   };
@@ -131,17 +150,39 @@ export default function ShopRegistrationForm() {
         }
       });
 
-      // Append files
+      let logoUrl = "";
+      let verificationDocUrl = "";
+
       if (formData.logo) {
-        formDataToSend.append("logo", formData.logo);
+        const uniqueId = `${formData.name
+          .replace(/\s+/g, "-")
+          .toLowerCase()}-${Date.now()}`;
+        const result = await uploadToCloudinaryViaAPI(
+          formData.logo,
+          "locallens/shop-logos",
+          uniqueId,
+          getIdToken // Pass your getIdToken function from useAuth
+        );
+        logoUrl = result.secure_url;
       }
 
       if (formData.verificationDocument) {
-        formDataToSend.append(
-          "verificationDocument",
-          formData.verificationDocument
+        const uniqueId = `verification-${formData.gstin.replace(
+          /[^a-zA-Z0-9]/g,
+          ""
+        )}-${Date.now()}`;
+        const result = await uploadToCloudinaryViaAPI(
+          formData.verificationDocument,
+          "locallens/verification-docs",
+          uniqueId,
+          getIdToken
         );
+        verificationDocUrl = result.secure_url;
       }
+
+      // Append Cloudinary URLs
+      formDataToSend.append("logoUrl", logoUrl);
+      formDataToSend.append("verificationDocumentUrl", verificationDocUrl);
 
       // Append arrays correctly
       formData.categories.forEach((category) => {
@@ -158,22 +199,17 @@ export default function ShopRegistrationForm() {
         formDataToSend.append("userId", mongoUser._id);
       }
 
-      // Create headers with user information
-      const headers = {};
-      if (user?.email) {
-        headers["x-user-email"] = user.email;
-      } else if (mongoUser?.email) {
-        headers["x-user-email"] = mongoUser.email;
-      }
+      const token = await getIdToken();
 
-      console.log(
-        "Submitting shop registration form with email:",
-        headers["x-user-email"]
-      );
+      if (!token) {
+        throw new Error("Authentication token not available");
+      }
 
       const response = await fetch("/api/shops", {
         method: "POST",
-        headers,
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
         body: formDataToSend,
       });
 

@@ -12,6 +12,7 @@ import {
   Check,
   X,
 } from "lucide-react";
+import { useAuth } from "@/lib/context/AuthContext";
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
@@ -36,16 +37,54 @@ export default function AdminDashboard() {
     recentShops: [],
   });
   const [isLoading, setIsLoading] = useState(true);
+  const { getIdToken } = useAuth();
 
   useEffect(() => {
     const fetchDashboardStats = async () => {
       try {
-        const response = await fetch("/api/admin/dashboard");
+        // Get Firebase token
+        const token = await getIdToken();
+
+        if (!token) {
+          throw new Error("Authentication token not available");
+        }
+
+        const response = await fetch("/api/admin/dashboard", {
+          headers: {
+            Authorization: `Bearer ${token}`, // Add the token to your request
+          },
+        });
+
         if (!response.ok) {
           throw new Error("Failed to fetch dashboard data");
         }
-        const data = await response.json();
-        setStats(data);
+
+        const apiData = await response.json();
+
+        console.log("API Data:", apiData); // Debugging line
+
+        // Transform the API data to match your component's expected format
+        setStats({
+          users: {
+            total: apiData.userMetrics.total || 0,
+            customers: apiData.userMetrics.customers || 0,
+            retailers: apiData.userMetrics.retailers || 0,
+          },
+          shops: {
+            total: apiData.shopMetrics.total || 0,
+            pending: apiData.shopMetrics.pending || 0,
+            verified: apiData.shopMetrics.verified || 0,
+            rejected: apiData.shopMetrics.rejected || 0,
+          },
+          products: {
+            total: apiData.productMetrics?.total || 0, // This isn't in your current API
+          },
+          orders: {
+            total: apiData.orderMetrics.total || 0,
+            pendingDelivery: apiData.orderMetrics.processing || 0,
+          },
+          recentShops: apiData.recentShops || [], // This isn't in your current API
+        });
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
       } finally {

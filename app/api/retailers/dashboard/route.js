@@ -4,22 +4,19 @@ import Shop from "@/models/Shop.model";
 import Order from "@/models/Order.model";
 import Reservation from "@/models/Reservation.model";
 import Product from "@/models/Product.model";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { withFirebaseAuth } from "@/middleware/firebase-auth";
 import mongoose from "mongoose";
 
 export async function GET(request) {
+  return withFirebaseAuth(request, handleGetRequest, ["retailer", "admin"]);
+}
+
+async function handleGetRequest(request, user) {
   try {
     await dbConnect();
 
-    // Get user session
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Get the user ID from the session
-    const userId = session.user.id;
+    // Get the user ID from the Firebase auth middleware
+    const userId = user._id;
 
     // Get shops
     const shops = await Shop.find({ ownerId: userId });

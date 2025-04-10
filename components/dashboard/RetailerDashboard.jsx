@@ -20,9 +20,10 @@ import {
   MapPin,
 } from "lucide-react";
 import ShopStatusBanner from "@/components/retailers/ShopStatusBanner";
+import { getAuth } from "firebase/auth"; // Import Firebase directly
 
 export default function RetailerDashboard() {
-  const { user, mongoUser } = useAuth();
+  const { user, mongoUser, getIdToken } = useAuth();
   const [dashboardData, setDashboardData] = useState({
     shops: {
       total: 0,
@@ -57,17 +58,39 @@ export default function RetailerDashboard() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [currentDate] = useState(new Date());
+  // const { user, getIdToken } = useAuth();
 
   useEffect(() => {
     async function fetchDashboardData() {
       try {
-        const response = await fetch("/api/retailers/dashboard");
+        setIsLoading(true);
 
+        // Get Firebase token
+        const auth = getAuth();
+        const currentUser = auth.currentUser;
+
+        if (!currentUser) {
+          throw new Error("No user is signed in");
+        }
+
+        // Get token directly from Firebase
+        const token = await currentUser.getIdToken(true);
+        console.log(
+          "Firebase token retrieved:",
+          token ? "Yes (valid token)" : "No"
+        );
+
+        const response = await fetch("/api/admin/dashboard", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
         if (!response.ok) {
           throw new Error("Failed to fetch dashboard data");
         }
 
         const data = await response.json();
+        console.log("Dashboard data:", data);
         setDashboardData(data);
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
