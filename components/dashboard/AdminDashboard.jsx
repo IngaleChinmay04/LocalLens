@@ -38,7 +38,85 @@ export default function AdminDashboard() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const { getIdToken } = useAuth();
+  // Add these functions before the return statement
 
+  const handleApproveShop = async (shopId) => {
+    try {
+      const token = await getIdToken();
+
+      if (!token) {
+        throw new Error("Authentication token not available");
+      }
+
+      const response = await fetch(`/api/admin/shops/${shopId}/approve`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to approve shop");
+      }
+
+      // Update local state to remove the approved shop from the list
+      setStats((prevStats) => ({
+        ...prevStats,
+        recentShops: prevStats.recentShops.filter(
+          (shop) => shop._id !== shopId
+        ),
+        shops: {
+          ...prevStats.shops,
+          pending: prevStats.shops.pending - 1,
+          verified: prevStats.shops.verified + 1,
+          total: prevStats.shops.total, // total stays the same
+        },
+      }));
+    } catch (error) {
+      console.error("Error approving shop:", error);
+      alert("Failed to approve shop. Please try again.");
+    }
+  };
+
+  const handleRejectShop = async (shopId) => {
+    try {
+      const token = await getIdToken();
+
+      if (!token) {
+        throw new Error("Authentication token not available");
+      }
+
+      const response = await fetch(`/api/admin/shops/${shopId}/reject`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to reject shop");
+      }
+
+      // Update local state to remove the rejected shop from the list
+      setStats((prevStats) => ({
+        ...prevStats,
+        recentShops: prevStats.recentShops.filter(
+          (shop) => shop._id !== shopId
+        ),
+        shops: {
+          ...prevStats.shops,
+          pending: prevStats.shops.pending - 1,
+          rejected: prevStats.shops.rejected + 1,
+          total: prevStats.shops.total, // total stays the same
+        },
+      }));
+    } catch (error) {
+      console.error("Error rejecting shop:", error);
+      alert("Failed to reject shop. Please try again.");
+    }
+  };
   useEffect(() => {
     const fetchDashboardStats = async () => {
       try {

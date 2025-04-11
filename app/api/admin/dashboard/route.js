@@ -47,7 +47,7 @@ export async function GET(request) {
       // Shop metrics
       const shopCount = await Shop.countDocuments({});
       const verifiedShopCount = await Shop.countDocuments({ isVerified: true });
-      const pendingShopCount = await Shop.countDocuments({ isVerified: null });
+      const pendingShopCount = await Shop.countDocuments({ isVerified: false });
       const rejectedShopCount = await Shop.countDocuments({
         isVerified: false,
       });
@@ -80,7 +80,7 @@ export async function GET(request) {
       });
 
       // Add pending shops data for the dashboard
-      const pendingShops = await Shop.find({ isVerified: null })
+      const pendingShops = await Shop.find({ isVerified: false })
         .sort({ createdAt: -1 })
         .limit(5)
         .select("name logo createdAt _id");

@@ -2,74 +2,40 @@ import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import Shop from "@/models/Shop.model";
 import User from "@/models/User.model";
+import { withFirebaseAuth } from "@/middleware/firebase-auth";
 
 export async function POST(request) {
+  return withFirebaseAuth(request, handlePostRequest, ["customer", "retailer"]);
+}
+
+async function handlePostRequest(request, user) {
   try {
     await dbConnect();
 
     // Get form data from the request
     const formData = await request.formData();
 
-    // Try to get user ID from header or formData
-    let userId = null;
-    const userEmail = request.headers.get("x-user-email");
-
-    if (userEmail) {
-      // Find user by email
-      const user = await User.findOne({ email: userEmail });
-      if (user) {
-        userId = user._id;
-      }
-    }
-
-    // As a fallback, check if there's a userId in formData
-    if (!userId && formData.get("userId")) {
-      userId = formData.get("userId");
-    }
-
-    // If we still don't have a userId, use a dummy user for testing
-    // IMPORTANT: Remove this in production
-    if (!userId) {
-      console.log(
-        "⚠️ Warning: Using dummy user ID for testing. Remove in production."
-      );
-      // Find any user with role "retailer" to use as a placeholder
-      const dummyUser = await User.findOne({ role: "retailer" });
-      if (dummyUser) {
-        userId = dummyUser._id;
-      } else {
-        // If no retailer user exists, find any user
-        const anyUser = await User.findOne({});
-        if (anyUser) {
-          userId = anyUser._id;
-          // Update this user to be a retailer
-          await User.findByIdAndUpdate(anyUser._id, { role: "retailer" });
-        } else {
-          return NextResponse.json(
-            {
-              error:
-                "No users found in the system. Please create a user first.",
-            },
-            { status: 400 }
-          );
-        }
-      }
-    }
+    // Use the authenticated user from Firebase middleware
+    const userId = user._id;
 
     // Process logo upload if it exists
     let logoUrl = null;
     const logoFile = formData.get("logo");
     if (logoFile && logoFile.size > 0) {
       // For development purposes, store a placeholder URL
-      logoUrl = "https://placeholder.com/shop_logo_" + Date.now();
+      // In production, this should be replaced with actual image upload logic
+      logoUrl =
+        formData.get("logoUrl") ||
+        "https://placeholder.com/shop_logo_" + Date.now();
     }
 
     // Process verification document upload if it exists
     let verificationDocUrl = null;
     const verificationDocFile = formData.get("verificationDocument");
     if (verificationDocFile && verificationDocFile.size > 0) {
-      // For development purposes, store a placeholder URL
+      // In production, this should be replaced with actual document upload logic
       verificationDocUrl =
+        formData.get("verificationDocumentUrl") ||
         "https://placeholder.com/verification_doc_" + Date.now();
     }
 
@@ -118,7 +84,7 @@ export async function POST(request) {
     console.log("Shop created successfully:", newShop._id);
 
     // Update user role to retailer if not already
-    if (userId) {
+    if (user.role !== "retailer") {
       await User.findByIdAndUpdate(
         userId,
         { $set: { role: "retailer" } },

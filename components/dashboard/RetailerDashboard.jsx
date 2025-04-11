@@ -80,7 +80,7 @@ export default function RetailerDashboard() {
           token ? "Yes (valid token)" : "No"
         );
 
-        const response = await fetch("/api/admin/dashboard", {
+        const response = await fetch("/api/retailers/dashboard", {
           headers: {
             Authorization: `Bearer ${token}`,
           },
