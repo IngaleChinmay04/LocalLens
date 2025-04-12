@@ -2,148 +2,270 @@ import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import Product from "@/models/Product.model";
 import Shop from "@/models/Shop.model";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { withFirebaseAuth } from "@/middleware/firebase-auth";
+import mongoose from "mongoose";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 
+export async function GET(request) {
+  return withFirebaseAuth(request, handleGetRequest, [
+    "retailer",
+    "admin",
+    "customer",
+  ]);
+}
+
 export async function POST(request) {
+  return withFirebaseAuth(request, handlePostRequest, ["retailer", "admin"]);
+}
+
+async function handleGetRequest(request, user) {
   try {
     await dbConnect();
 
-    // Get user session
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { searchParams } = new URL(request.url);
+    const shopId = searchParams.get("shopId");
+    const category = searchParams.get("category");
+    const search = searchParams.get("search");
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "20");
+    const sort = searchParams.get("sort") || "createdAt";
+    const order = searchParams.get("order") || "desc";
 
-    // Get the user ID from the session
-    const userId = session.user.id;
+    // Build query
+    const query = {};
 
-    // Get form data from the request
-    const formData = await request.formData();
-    const shopId = formData.get("shopId");
+    if (shopId) {
+      // Validate shopId
+      if (!mongoose.Types.ObjectId.isValid(shopId)) {
+        return NextResponse.json({ error: "Invalid shop ID" }, { status: 400 });
+      }
+      query.shopId = shopId;
 
-    // Check if the shop belongs to the user
-    const shop = await Shop.findOne({
-      _id: shopId,
-      ownerId: userId,
-    });
-
-    if (!shop) {
-      return NextResponse.json(
-        { error: "Shop not found or you don't have permission" },
-        { status: 404 }
-      );
-    }
-
-    // Process image uploads if they exist
-    const imageFiles = formData.getAll("images");
-    const imageUrls = [];
-
-    if (imageFiles.length > 0) {
-      for (let i = 0; i < imageFiles.length; i++) {
-        const imageFile = imageFiles[i];
-        if (imageFile.size > 0) {
-          const uploadResult = await uploadToCloudinary(
-            imageFile,
-            "product_images",
-            `product_${shopId}_${Date.now()}_${i}`
+      // For retailers, verify shop ownership
+      if (user.role === "retailer") {
+        const shop = await Shop.findById(shopId).lean();
+        if (!shop) {
+          return NextResponse.json(
+            { error: "Shop not found" },
+            { status: 404 }
           );
-          imageUrls.push({
-            url: uploadResult.secure_url,
-            alt: formData.get("name"),
-            isDefault: i === 0, // Make the first image the default
-          });
+        }
+
+        if (shop.ownerId.toString() !== user._id.toString()) {
+          return NextResponse.json(
+            {
+              error: "You don't have permission to view products for this shop",
+            },
+            { status: 403 }
+          );
         }
       }
-    }
+    } else if (user.role === "retailer") {
+      // If no shopId provided but user is retailer, get all shops owned by user
+      const shops = await Shop.find({ ownerId: user._id }).lean();
+      const shopIds = shops.map((shop) => shop._id);
 
-    // Parse the attributes if they exist
-    let attributes = {};
-    const attributesJson = formData.get("attributes");
-    if (attributesJson) {
-      try {
-        attributes = JSON.parse(attributesJson);
-      } catch (e) {
-        console.error("Error parsing attributes:", e);
+      if (shopIds.length > 0) {
+        query.shopId = { $in: shopIds };
       }
     }
 
-    // Parse variant attributes if they exist
-    let variantAttributes = [];
-    const variantAttributesJson = formData.get("variantAttributes");
-    if (variantAttributesJson) {
-      try {
-        variantAttributes = JSON.parse(variantAttributesJson);
-      } catch (e) {
-        console.error("Error parsing variant attributes:", e);
+    if (category) {
+      query.category = category;
+    }
+
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { shortDescription: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    // For customers, only show active products
+    if (user.role === "customer") {
+      query.isActive = true;
+    }
+
+    // Calculate pagination
+    const skip = (page - 1) * limit;
+
+    // Create sort object
+    const sortObj = {};
+    sortObj[sort] = order === "desc" ? -1 : 1;
+
+    // Execute query with pagination
+    const products = await Product.find(query)
+      .sort(sortObj)
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    // Get total count for pagination
+    const total = await Product.countDocuments(query);
+
+    return NextResponse.json({
+      products,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching products:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch products" },
+      { status: 500 }
+    );
+  }
+}
+
+async function handlePostRequest(request, user) {
+  try {
+    await dbConnect();
+
+    // Parse the form data from the request
+    const formData = await request.formData();
+
+    // Get the shop ID
+    const shopId = formData.get("shopId");
+
+    if (!shopId || !mongoose.Types.ObjectId.isValid(shopId)) {
+      return NextResponse.json({ error: "Invalid shop ID" }, { status: 400 });
+    }
+
+    // Check if user owns the shop (for retailers)
+    if (user.role === "retailer") {
+      const shop = await Shop.findById(shopId).lean();
+
+      if (!shop) {
+        return NextResponse.json({ error: "Shop not found" }, { status: 404 });
+      }
+
+      if (shop.ownerId.toString() !== user._id.toString()) {
+        return NextResponse.json(
+          { error: "You don't have permission to add products to this shop" },
+          { status: 403 }
+        );
       }
     }
 
-    // Parse prebook config if it exists
-    let preBookConfig = {};
-    const preBookConfigJson = formData.get("preBookConfig");
-    if (preBookConfigJson) {
-      try {
-        preBookConfig = JSON.parse(preBookConfigJson);
-      } catch (e) {
-        console.error("Error parsing prebook config:", e);
-      }
-    }
-
-    // Create the product object
+    // Create product data object
     const productData = {
       shopId,
       name: formData.get("name"),
       description: formData.get("description"),
       shortDescription: formData.get("shortDescription"),
       category: formData.get("category"),
-      subcategory: formData.get("subcategory"),
+      subcategory: formData.get("subcategory") || undefined,
       basePrice: parseFloat(formData.get("basePrice")),
       discountPercentage: parseFloat(formData.get("discountPercentage") || 0),
       tax: parseFloat(formData.get("tax") || 0),
       currency: formData.get("currency") || "INR",
-      images: imageUrls,
-      tags: formData.getAll("tags[]"),
-      brand: formData.get("brand"),
-      sku: formData.get("sku"),
-      barcode: formData.get("barcode"),
-      availableQuantity: parseInt(formData.get("availableQuantity") || 0),
-      minOrderQuantity: parseInt(formData.get("minOrderQuantity") || 1),
-      maxOrderQuantity: parseInt(formData.get("maxOrderQuantity") || 0),
-      isAvailable: formData.get("isAvailable") === "true",
-      isPreBookable: formData.get("isPreBookable") === "true",
-      preBookConfig,
-      attributes,
-      hasVariants: formData.get("hasVariants") === "true",
-      variantAttributes,
+      availableQuantity: parseInt(formData.get("availableQuantity"), 10),
+      sku: formData.get("sku") || undefined,
+      weight: formData.get("weight")
+        ? parseFloat(formData.get("weight"))
+        : undefined,
+      dimensions: {
+        length: formData.get("dimensions[length]")
+          ? parseFloat(formData.get("dimensions[length]"))
+          : undefined,
+        width: formData.get("dimensions[width]")
+          ? parseFloat(formData.get("dimensions[width]"))
+          : undefined,
+        height: formData.get("dimensions[height]")
+          ? parseFloat(formData.get("dimensions[height]"))
+          : undefined,
+      },
+      isActive: formData.get("isActive") === "true",
     };
 
-    // Handle weight and dimensions if they exist
-    if (formData.get("weightValue")) {
-      productData.weight = {
-        value: parseFloat(formData.get("weightValue")),
-        unit: formData.get("weightUnit") || "g",
-      };
+    // Handle variants
+    const hasVariants = formData.get("hasVariants") === "true";
+    productData.hasVariants = hasVariants;
+
+    if (hasVariants) {
+      const variantTypesJson = formData.get("variantTypes");
+      if (variantTypesJson) {
+        try {
+          productData.variantTypes = JSON.parse(variantTypesJson);
+        } catch (e) {
+          console.error("Error parsing variant types:", e);
+        }
+      }
     }
 
-    if (formData.get("dimensionsLength")) {
-      productData.dimensions = {
-        length: parseFloat(formData.get("dimensionsLength")),
-        width: parseFloat(formData.get("dimensionsWidth")),
-        height: parseFloat(formData.get("dimensionsHeight")),
-        unit: formData.get("dimensionsUnit") || "cm",
-      };
+    // Handle pre-booking config
+    const isPreBookable = formData.get("isPreBookable") === "true";
+    productData.isPreBookable = isPreBookable;
+
+    if (isPreBookable) {
+      const preBookConfigJson = formData.get("preBookConfig");
+      if (preBookConfigJson) {
+        try {
+          productData.preBookConfig = JSON.parse(preBookConfigJson);
+        } catch (e) {
+          console.error("Error parsing pre-book config:", e);
+        }
+      }
     }
 
-    // Create the product in the database
-    const newProduct = await Product.create(productData);
+    // Handle pre-buying config
+    const isPreBuyable = formData.get("isPreBuyable") === "true";
+    productData.isPreBuyable = isPreBuyable;
 
-    return NextResponse.json(newProduct, { status: 201 });
+    if (isPreBuyable) {
+      const preBuyConfigJson = formData.get("preBuyConfig");
+      if (preBuyConfigJson) {
+        try {
+          productData.preBuyConfig = JSON.parse(preBuyConfigJson);
+        } catch (e) {
+          console.error("Error parsing pre-buy config:", e);
+        }
+      }
+    }
+
+    // Handle image uploads
+    const imageFiles = formData.getAll("images");
+    const images = [];
+
+    if (imageFiles && imageFiles.length > 0) {
+      for (const file of imageFiles) {
+        if (file.size > 0) {
+          const uniqueId = `product_${Date.now()}_${Math.random()
+            .toString(36)
+            .substring(2, 15)}`;
+          try {
+            const result = await uploadToCloudinary(
+              file,
+              "locallens/products",
+              uniqueId
+            );
+            images.push({
+              url: result.secure_url,
+              publicId: result.public_id,
+            });
+          } catch (err) {
+            console.error("Image upload failed:", err);
+          }
+        }
+      }
+    }
+
+    productData.images = images;
+
+    // Create product
+    const product = new Product(productData);
+    await product.save();
+
+    return NextResponse.json(product, { status: 201 });
   } catch (error) {
     console.error("Error creating product:", error);
     return NextResponse.json(
-      { error: "Failed to create product" },
+      { error: "Failed to create product: " + error.message },
       { status: 500 }
     );
   }
