@@ -367,6 +367,9 @@ export default function ProductForm({ product, shopId, isEditing = false }) {
         productFormData.append("images", file);
       });
 
+      // Make sure we're explicitly adding isActive to the form data
+      productFormData.append("isActive", formData.isActive);
+
       // Make API request to create/update product
       const url = isEditing ? `/api/products/${product._id}` : "/api/products";
 
