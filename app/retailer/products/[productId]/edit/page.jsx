@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useRouter } from "next/navigation";
@@ -9,7 +10,10 @@ import ProductForm from "@/components/retailers/ProductForm";
 import { toast } from "react-hot-toast";
 
 export default function EditProductPage({ params }) {
-  const { productId } = params;
+  // Use React.use to unwrap the params promise for Next.js 14+
+  const unwrappedParams = React.use(params);
+  const { productId } = unwrappedParams;
+
   const { user, mongoUser, loading, getIdToken } = useAuth();
   const router = useRouter();
   const [product, setProduct] = useState(null);

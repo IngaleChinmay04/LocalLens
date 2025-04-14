@@ -337,9 +337,25 @@ export default function ProductForm({ product, shopId, isEditing = false }) {
       productFormData.append("shopId", selectedShop || shopId);
 
       // Add variants if applicable
+      let validVariantTypes = [];
       if (hasVariants) {
         productFormData.append("hasVariants", "true");
-        productFormData.append("variantTypes", JSON.stringify(variantTypes));
+
+        // Filter out incomplete variant types (no name or no options)
+        validVariantTypes = variantTypes.filter(
+          (vt) => vt.name.trim() && vt.options.some((opt) => opt.trim())
+        );
+
+        // Only include variant types that have valid data
+        if (validVariantTypes.length > 0) {
+          productFormData.append(
+            "variantTypes",
+            JSON.stringify(validVariantTypes)
+          );
+        } else {
+          // If no valid variant types, don't set hasVariants
+          productFormData.set("hasVariants", "false");
+        }
       }
 
       // Add pre-booking config if applicable
@@ -390,6 +406,33 @@ export default function ProductForm({ product, shopId, isEditing = false }) {
         throw new Error(error.error || "Failed to save product");
       }
 
+      const savedProduct = await response.json();
+
+      // If product has variants, create the variants for each combination
+      if (
+        hasVariants &&
+        savedProduct.hasVariants &&
+        validVariantTypes.length > 0
+      ) {
+        // Let the user know we're setting up variants
+        const variantToastId = toast.loading("Setting up product variants...");
+
+        try {
+          // Generate all combinations of variants
+          await createVariantCombinations(
+            savedProduct._id,
+            validVariantTypes,
+            token
+          );
+          toast.success("Variants created successfully");
+        } catch (variantError) {
+          console.error("Error creating variants:", variantError);
+          toast.error("Error creating variants: " + variantError.message);
+        } finally {
+          toast.dismiss(variantToastId);
+        }
+      }
+
       toast.success(
         isEditing
           ? "Product updated successfully!"
@@ -405,6 +448,77 @@ export default function ProductForm({ product, shopId, isEditing = false }) {
       toast.error(error.message || "Error saving product");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Helper function to create variant combinations
+  const createVariantCombinations = async (productId, variantTypes, token) => {
+    // Generate all possible combinations of variants
+    const generateCombinations = (types, current = {}, index = 0) => {
+      if (index === types.length) {
+        return [current];
+      }
+
+      const currentType = types[index];
+      const results = [];
+
+      // Skip empty options
+      const validOptions = currentType.options.filter((opt) => opt.trim());
+
+      for (const option of validOptions) {
+        const updatedCurrent = {
+          ...current,
+          [currentType.name]: option,
+        };
+        results.push(...generateCombinations(types, updatedCurrent, index + 1));
+      }
+
+      return results;
+    };
+
+    const combinations = generateCombinations(variantTypes);
+    console.log("Generated combinations:", combinations);
+
+    // Create each variant
+    for (const attributes of combinations) {
+      // Skip if the combination is empty
+      if (Object.keys(attributes).length === 0) continue;
+
+      const variantData = {
+        attributes,
+        price: parseFloat(formData.basePrice) || 0, // Default to base price
+        discountPercentage: parseFloat(formData.discountPercentage) || 0,
+        availableQuantity:
+          Math.floor(
+            parseInt(formData.availableQuantity, 10) / combinations.length
+          ) || 1, // Evenly distribute quantity
+        isActive: formData.isActive === true || formData.isActive === "true",
+      };
+
+      console.log("Creating variant with data:", variantData);
+
+      try {
+        const response = await fetch(`/api/products/${productId}/variants`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(variantData),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error("Variant creation error:", errorData);
+          throw new Error(errorData.error || "Failed to create variant");
+        }
+
+        const result = await response.json();
+        console.log("Created variant:", result);
+      } catch (error) {
+        console.error("Error creating variant:", error);
+        // Continue with other variants even if one fails
+      }
     }
   };
 

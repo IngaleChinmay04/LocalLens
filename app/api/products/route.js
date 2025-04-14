@@ -180,7 +180,10 @@ async function handlePostRequest(request, user) {
           ? parseFloat(formData.get("dimensions[height]"))
           : undefined,
       },
+      // Handle both isActive and isAvailable for consistency
       isActive: formData.get("isActive") === "true",
+      isAvailable: formData.get("isAvailable") !== "false", // Default to true unless explicitly false
+      tags: formData.get("tags") ? JSON.parse(formData.get("tags")) : [],
     };
 
     // Handle variants
@@ -192,6 +195,26 @@ async function handlePostRequest(request, user) {
       if (variantTypesJson) {
         try {
           productData.variantTypes = JSON.parse(variantTypesJson);
+
+          // Extract variant attributes for compatibility with existing code
+          const variantAttributes = productData.variantTypes.map((type) => {
+            // Convert type names to match the enum in the schema
+            let attributeType = type.name.toLowerCase();
+            // Map to one of the allowed enum values
+            if (
+              !["color", "size", "material", "style"].includes(attributeType)
+            ) {
+              attributeType = "other";
+            }
+            return attributeType;
+          });
+
+          if (variantAttributes.length > 0) {
+            productData.variantAttributes = [...new Set(variantAttributes)]; // Deduplicate attributes
+          }
+
+          // Initialize empty variants array
+          productData.variants = [];
         } catch (e) {
           console.error("Error parsing variant types:", e);
         }
@@ -247,6 +270,8 @@ async function handlePostRequest(request, user) {
             images.push({
               url: result.secure_url,
               publicId: result.public_id,
+              alt: formData.get("name") || "Product Image",
+              isDefault: images.length === 0, // First image is the default
             });
           } catch (err) {
             console.error("Image upload failed:", err);

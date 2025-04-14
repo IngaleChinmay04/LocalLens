@@ -7,38 +7,42 @@ import mongoose from "mongoose";
 import { uploadToCloudinary, deleteFromCloudinary } from "@/lib/cloudinary";
 
 export async function GET(request, { params }) {
+  const productId = params.productId;
   return withFirebaseAuth(
     request,
-    (req, user) => handleGetRequest(req, user, params),
+    (req, user) => handleGetRequest(req, user, productId),
     ["retailer", "admin", "customer"]
   );
 }
 
 export async function PUT(request, { params }) {
+  const productId = params.productId;
   return withFirebaseAuth(
     request,
-    (req, user) => handlePutRequest(req, user, params),
+    (req, user) => handlePutRequest(req, user, productId),
     ["retailer", "admin"]
   );
 }
 
 export async function PATCH(request, { params }) {
+  const productId = params.productId;
   return withFirebaseAuth(
     request,
-    (req, user) => handlePatchRequest(req, user, params),
+    (req, user) => handlePatchRequest(req, user, productId),
     ["retailer", "admin"]
   );
 }
 
 export async function DELETE(request, { params }) {
+  const productId = params.productId;
   return withFirebaseAuth(
     request,
-    (req, user) => handleDeleteRequest(req, user, params),
+    (req, user) => handleDeleteRequest(req, user, productId),
     ["retailer", "admin"]
   );
 }
 
-async function handleGetRequest(request, user, { productId }) {
+async function handleGetRequest(request, user, productId) {
   try {
     await dbConnect();
 
@@ -85,7 +89,7 @@ async function handleGetRequest(request, user, { productId }) {
   }
 }
 
-async function handlePutRequest(request, user, { productId }) {
+async function handlePutRequest(request, user, productId) {
   try {
     await dbConnect();
 
@@ -145,7 +149,12 @@ async function handlePutRequest(request, user, { productId }) {
           ? parseFloat(formData.get("dimensions[height]"))
           : undefined,
       },
+      // Handle both isActive and isAvailable consistently
       isActive: formData.get("isActive") === "true",
+      isAvailable: formData.get("isAvailable") !== "false", // Default to true unless explicitly false
+      tags: formData.get("tags")
+        ? JSON.parse(formData.get("tags"))
+        : existingProduct.tags,
       updatedAt: new Date(),
     };
 
@@ -158,6 +167,32 @@ async function handlePutRequest(request, user, { productId }) {
       if (variantTypesJson) {
         try {
           productData.variantTypes = JSON.parse(variantTypesJson);
+
+          // Extract variant attributes for compatibility with existing code
+          const variantAttributes = productData.variantTypes.map((type) => {
+            // Convert type names to match the enum in the schema
+            let attributeType = type.name.toLowerCase();
+            // Map to one of the allowed enum values
+            if (
+              !["color", "size", "material", "style"].includes(attributeType)
+            ) {
+              attributeType = "other";
+            }
+            return attributeType;
+          });
+
+          if (variantAttributes.length > 0) {
+            productData.variantAttributes = [...new Set(variantAttributes)]; // Deduplicate attributes
+          }
+
+          // Don't reset variants array during update, as it would remove existing variants
+          // Just ensure it exists if needed
+          if (
+            !existingProduct.variants ||
+            !Array.isArray(existingProduct.variants)
+          ) {
+            productData.variants = [];
+          }
         } catch (e) {
           console.error("Error parsing variant types:", e);
         }
@@ -165,6 +200,7 @@ async function handlePutRequest(request, user, { productId }) {
     } else {
       // If variants are disabled, clear variant types
       productData.variantTypes = [];
+      productData.variantAttributes = [];
     }
 
     // Handle pre-booking config
@@ -253,6 +289,8 @@ async function handlePutRequest(request, user, { productId }) {
             newImages.push({
               url: result.secure_url,
               publicId: result.public_id,
+              alt: productData.name || "Product Image",
+              isDefault: existingImages.length === 0 && newImages.length === 0, // First image is default if no others exist
             });
           } catch (err) {
             console.error("Image upload failed:", err);
@@ -288,7 +326,7 @@ async function handlePutRequest(request, user, { productId }) {
   }
 }
 
-async function handlePatchRequest(request, user, { productId }) {
+async function handlePatchRequest(request, user, productId) {
   try {
     await dbConnect();
 
@@ -322,6 +360,20 @@ async function handlePatchRequest(request, user, { productId }) {
     const body = await request.json();
     body.updatedAt = new Date();
 
+    // Handle special case for isActive/isAvailable to keep them in sync
+    if (
+      body.hasOwnProperty("isActive") &&
+      !body.hasOwnProperty("isAvailable")
+    ) {
+      body.isAvailable = body.isActive;
+    }
+    if (
+      body.hasOwnProperty("isAvailable") &&
+      !body.hasOwnProperty("isActive")
+    ) {
+      body.isActive = body.isAvailable;
+    }
+
     // Apply updates
     const updatedProduct = await Product.findByIdAndUpdate(
       productId,
@@ -346,7 +398,7 @@ async function handlePatchRequest(request, user, { productId }) {
   }
 }
 
-async function handleDeleteRequest(request, user, { productId }) {
+async function handleDeleteRequest(request, user, productId) {
   try {
     await dbConnect();
 

@@ -6,30 +6,33 @@ import { withFirebaseAuth } from "@/middleware/firebase-auth";
 import mongoose from "mongoose";
 
 export async function GET(request, { params }) {
+  const productId = params.productId;
   return withFirebaseAuth(
     request,
-    (req, user) => handleGetRequest(req, user, params),
+    (req, user) => handleGetRequest(req, user, productId),
     ["retailer", "admin", "customer"]
   );
 }
 
 export async function POST(request, { params }) {
+  const productId = params.productId;
   return withFirebaseAuth(
     request,
-    (req, user) => handlePostRequest(req, user, params),
+    (req, user) => handlePostRequest(req, user, productId),
     ["retailer", "admin"]
   );
 }
 
 export async function PUT(request, { params }) {
+  const productId = params.productId;
   return withFirebaseAuth(
     request,
-    (req, user) => handlePutRequest(req, user, params),
+    (req, user) => handlePutRequest(req, user, productId),
     ["retailer", "admin"]
   );
 }
 
-async function handleGetRequest(request, user, { productId }) {
+async function handleGetRequest(request, user, productId) {
   try {
     await dbConnect();
 
@@ -75,7 +78,7 @@ async function handleGetRequest(request, user, { productId }) {
   }
 }
 
-async function handlePostRequest(request, user, { productId }) {
+async function handlePostRequest(request, user, productId) {
   try {
     await dbConnect();
 
@@ -185,7 +188,7 @@ async function handlePostRequest(request, user, { productId }) {
   }
 }
 
-async function handlePutRequest(request, user, { productId }) {
+async function handlePutRequest(request, user, productId) {
   try {
     await dbConnect();
 

@@ -68,6 +68,7 @@ const ProductSchema = new mongoose.Schema(
           type: Boolean,
           default: false,
         },
+        publicId: String,
       },
     ],
     tags: [
@@ -125,11 +126,17 @@ const ProductSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
     isPreBookable: {
       type: Boolean,
       default: false,
     },
     preBookConfig: {
+      startDate: Date,
+      endDate: Date,
       leadTime: {
         type: Number, // in hours
       },
@@ -140,6 +147,28 @@ const ProductSchema = new mongoose.Schema(
         type: Number,
         default: 0,
       },
+      limitPerCustomer: {
+        type: Number,
+        default: 1,
+      },
+      instructions: String,
+    },
+    isPreBuyable: {
+      type: Boolean,
+      default: false,
+    },
+    preBuyConfig: {
+      expectedDeliveryDate: Date,
+      earlyAccessDiscount: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      limitPerCustomer: {
+        type: Number,
+        default: 1,
+      },
+      instructions: String,
     },
     avgRating: {
       type: Number,
@@ -163,6 +192,52 @@ const ProductSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    variantTypes: [
+      {
+        name: String,
+        options: [String],
+      },
+    ],
+    variants: [
+      {
+        variantId: {
+          type: mongoose.Schema.Types.ObjectId,
+          auto: true,
+        },
+        attributes: {
+          type: Map,
+          of: String,
+        },
+        price: {
+          type: Number,
+          min: 0,
+        },
+        discountPercentage: {
+          type: Number,
+          min: 0,
+          max: 100,
+          default: 0,
+        },
+        availableQuantity: {
+          type: Number,
+          min: 0,
+          default: 0,
+        },
+        sku: String,
+        isActive: {
+          type: Boolean,
+          default: true,
+        },
+        images: [
+          {
+            url: String,
+            alt: String,
+            isDefault: Boolean,
+            publicId: String,
+          },
+        ],
+      },
+    ],
     variantAttributes: [
       {
         type: String,
@@ -215,6 +290,7 @@ ProductSchema.pre("save", function (next) {
 // Create indexes for efficient searching
 ProductSchema.index({ name: "text", description: "text", searchTerms: "text" });
 ProductSchema.index({ isAvailable: 1 });
+ProductSchema.index({ isActive: 1 });
 ProductSchema.index({ category: 1, subcategory: 1 });
 ProductSchema.index({ basePrice: 1 });
 ProductSchema.index({ createdAt: -1 });
