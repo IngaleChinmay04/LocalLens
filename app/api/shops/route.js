@@ -121,13 +121,10 @@ export async function GET(request) {
     );
 
     // Build query
-    const query = {};
-
-    // We only filter by verified and active status if not in development
-    if (process.env.NODE_ENV === "production") {
-      query.isVerified = true;
-      query.isActive = true;
-    }
+    const query = {
+      isVerified: true, // Only show verified shops
+      isActive: true, // Only show active shops
+    };
 
     // Add category filter if provided
     if (category) {
@@ -141,8 +138,16 @@ export async function GET(request) {
 
     // Add geospatial query if coordinates are provided
     if (lat && lng) {
-      // Simple distance query that works without geospatial index in development
-      // In production, this should use $near with a properly indexed location field
+      // Add location filter to query
+      query.location = {
+        $near: {
+          $geometry: {
+            type: "Point",
+            coordinates: [lng, lat],
+          },
+          $maxDistance: radius * 1000, // Convert km to meters
+        },
+      };
       console.log("Adding location filter to query");
     }
 

@@ -41,8 +41,12 @@ export default function ProductDetails() {
       setIsLoading(true);
 
       try {
-        // Fetch product details
-        const response = await fetch(`/api/products/${productId}`);
+        // Fetch product details with public access header
+        const response = await fetch(`/api/products/${productId}`, {
+          headers: {
+            "x-public-access": "true",
+          },
+        });
 
         if (!response.ok) {
           throw new Error("Failed to fetch product details");

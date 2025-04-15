@@ -657,9 +657,12 @@ export default function CustomerDashboard() {
               }
             />
           ) : (
-            getFilteredProducts(trendingProducts).map((product) => (
-              <ProductCard key={product._id} product={product} />
-            ))
+            // Show only the first 3 trending products
+            getFilteredProducts(trendingProducts)
+              .slice(0, 3)
+              .map((product) => (
+                <ProductCard key={product._id} product={product} />
+              ))
           )}
         </div>
       </div>
