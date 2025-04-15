@@ -7,7 +7,14 @@ import mongoose from "mongoose";
 import { uploadToCloudinary, deleteFromCloudinary } from "@/lib/cloudinary";
 
 export async function GET(request, { params }) {
+  // Make productId access explicit
   const productId = params.productId;
+
+  // Also handle public access for individual product viewing
+  if (request.headers.get("x-public-access") === "true") {
+    return handleGetRequest(request, { role: "public" }, productId);
+  }
+
   return withFirebaseAuth(
     request,
     (req, user) => handleGetRequest(req, user, productId),
@@ -16,6 +23,7 @@ export async function GET(request, { params }) {
 }
 
 export async function PUT(request, { params }) {
+  // Make productId access explicit
   const productId = params.productId;
   return withFirebaseAuth(
     request,
@@ -25,6 +33,7 @@ export async function PUT(request, { params }) {
 }
 
 export async function PATCH(request, { params }) {
+  // Make productId access explicit
   const productId = params.productId;
   return withFirebaseAuth(
     request,
@@ -34,6 +43,7 @@ export async function PATCH(request, { params }) {
 }
 
 export async function DELETE(request, { params }) {
+  // Make productId access explicit
   const productId = params.productId;
   return withFirebaseAuth(
     request,
@@ -60,7 +70,7 @@ async function handleGetRequest(request, user, productId) {
     }
 
     // For retailers, check if they own the shop that has this product
-    if (user.role === "retailer") {
+    if (user && user.role === "retailer") {
       const shop = await Shop.findById(product.shopId).lean();
 
       if (!shop || shop.ownerId.toString() !== user._id.toString()) {
@@ -72,11 +82,13 @@ async function handleGetRequest(request, user, productId) {
     }
 
     // For customers, check if product is active
-    if (user.role === "customer" && !product.isActive) {
-      return NextResponse.json(
-        { error: "Product not available" },
-        { status: 404 }
-      );
+    if ((user && user.role === "customer") || user?.role === "public") {
+      if (!product.isActive) {
+        return NextResponse.json(
+          { error: "Product not available" },
+          { status: 404 }
+        );
+      }
     }
 
     return NextResponse.json(product);

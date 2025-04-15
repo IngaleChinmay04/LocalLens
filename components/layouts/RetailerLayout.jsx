@@ -14,6 +14,8 @@ import {
   Menu,
   X,
   LogOut,
+  Star,
+  TrendingUp,
 } from "lucide-react";
 
 export default function RetailerLayout({ children }) {
@@ -33,9 +35,19 @@ export default function RetailerLayout({ children }) {
       icon: <Store className="w-5 h-5 mr-3" />,
     },
     {
-      title: "Products",
+      title: "All Products",
       path: "/retailer/products",
       icon: <Package className="w-5 h-5 mr-3" />,
+    },
+    {
+      title: "Featured Products",
+      path: "/retailer/products?filter=featured",
+      icon: <Star className="w-5 h-5 mr-3" />,
+    },
+    {
+      title: "Trending Products",
+      path: "/retailer/products?filter=trending",
+      icon: <TrendingUp className="w-5 h-5 mr-3" />,
     },
     {
       title: "Orders",

@@ -48,6 +48,20 @@ const ProductSchema = new mongoose.Schema(
       max: 100,
       default: 0,
     },
+    isFeatured: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    isTrending: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    viewCount: {
+      type: Number,
+      default: 0,
+    },
     tax: {
       type: Number,
       min: 0,

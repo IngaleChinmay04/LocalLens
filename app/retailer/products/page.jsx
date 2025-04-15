@@ -37,6 +37,7 @@ export default function ProductsPage() {
   const [sortOrder, setSortOrder] = useState("desc");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
+  const [filterType, setFilterType] = useState("");
 
   useEffect(() => {
     if (!loading && (!user || (mongoUser && mongoUser.role !== "retailer"))) {
@@ -64,7 +65,18 @@ export default function ProductsPage() {
     sortOrder,
     categoryFilter,
     activeFilter,
+    searchParams, // Add this to watch for URL search params changes
   ]);
+
+  useEffect(() => {
+    // Check for filter parameter in URL
+    const filterParam = searchParams.get("filter");
+    if (filterParam === "featured" || filterParam === "trending") {
+      setFilterType(filterParam);
+    } else {
+      setFilterType("");
+    }
+  }, [searchParams]);
 
   const fetchShops = async () => {
     try {
@@ -123,6 +135,13 @@ export default function ProductsPage() {
 
       if (activeFilter !== "all") {
         url += `&isActive=${activeFilter === "active"}`;
+      }
+
+      // Add filter for featured or trending products
+      if (filterType === "featured") {
+        url += "&isFeatured=true";
+      } else if (filterType === "trending") {
+        url += "&isTrending=true";
       }
 
       const response = await fetch(url, {
@@ -195,6 +214,90 @@ export default function ProductsPage() {
     } catch (error) {
       toast.error("Error deleting product");
       console.error("Error deleting product:", error);
+    }
+  };
+
+  const toggleProductFeatured = async (productId, currentValue) => {
+    try {
+      const token = await getIdToken();
+      if (!token) {
+        throw new Error("Authentication token not available");
+      }
+
+      const response = await fetch(`/api/products/${productId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          isFeatured: !currentValue,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update product");
+      }
+
+      // Update the product in the state
+      setProducts(
+        products.map((product) =>
+          product._id === productId
+            ? { ...product, isFeatured: !product.isFeatured }
+            : product
+        )
+      );
+
+      toast.success(
+        `Product ${
+          !currentValue ? "marked as featured" : "removed from featured"
+        }`
+      );
+    } catch (error) {
+      toast.error("Error updating product");
+      console.error("Error updating product:", error);
+    }
+  };
+
+  const toggleProductTrending = async (productId, currentValue) => {
+    try {
+      const token = await getIdToken();
+      if (!token) {
+        throw new Error("Authentication token not available");
+      }
+
+      const response = await fetch(`/api/products/${productId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          isTrending: !currentValue,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update product");
+      }
+
+      // Update the product in the state
+      setProducts(
+        products.map((product) =>
+          product._id === productId
+            ? { ...product, isTrending: !product.isTrending }
+            : product
+        )
+      );
+
+      toast.success(
+        `Product ${
+          !currentValue ? "marked as trending" : "removed from trending"
+        }`
+      );
+    } catch (error) {
+      toast.error("Error updating product");
+      console.error("Error updating product:", error);
     }
   };
 
@@ -655,23 +758,71 @@ export default function ProductsPage() {
                                 Pre-Buy
                               </span>
                             )}
+                            <button
+                              onClick={() =>
+                                toggleProductFeatured(
+                                  product._id,
+                                  product.isFeatured
+                                )
+                              }
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                product.isFeatured
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                              }`}
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="h-3 w-3 mr-1"
+                                viewBox="0 0 20 20"
+                                fill="currentColor"
+                              >
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                              </svg>
+                              {product.isFeatured ? "Featured" : "Feature"}
+                            </button>
+                            <button
+                              onClick={() =>
+                                toggleProductTrending(
+                                  product._id,
+                                  product.isTrending
+                                )
+                              }
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                product.isTrending
+                                  ? "bg-green-100 text-green-800"
+                                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                              }`}
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="h-3 w-3 mr-1"
+                                viewBox="0 0 20 20"
+                                fill="currentColor"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M12 7a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0V8.414l-4.293 4.293a1 1 0 01-1.414 0L8 10.414l-4.293 4.293a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0L11 10.586 14.586 7H12z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                              {product.isTrending ? "Trending" : "Set Trending"}
+                            </button>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <div className="flex justify-end space-x-3">
-                            <Link
-                              href={`/retailer/products/${product._id}/edit`}
-                              className="text-emerald-600 hover:text-emerald-900"
-                            >
-                              <Edit className="h-5 w-5" />
-                            </Link>
-                            <button
-                              onClick={() => handleDeleteProduct(product._id)}
-                              className="text-red-600 hover:text-red-900"
-                            >
-                              <Trash2 className="h-5 w-5" />
-                            </button>
-                          </div>
+                          <Link
+                            href={`/retailer/products/${product._id}/edit`}
+                            className="text-emerald-600 hover:text-emerald-900"
+                          >
+                            <Edit className="h-5 w-5 inline" />
+                          </Link>
+                          <button
+                            onClick={() => handleDeleteProduct(product._id)}
+                            className="text-red-600 hover:text-red-900 ml-4"
+                          >
+                            <Trash2 className="h-5 w-5 inline" />
+                          </button>
                         </td>
                       </tr>
                     ))}

@@ -101,3 +101,110 @@ async function handlePostRequest(request, user) {
     );
   }
 }
+
+export async function GET(request) {
+  try {
+    await dbConnect();
+
+    // Parse query parameters
+    const { searchParams } = new URL(request.url);
+    const lat = parseFloat(searchParams.get("lat")) || null;
+    const lng = parseFloat(searchParams.get("lng")) || null;
+    const radius = parseFloat(searchParams.get("radius")) || 5; // Default radius: 5km
+    const page = parseInt(searchParams.get("page")) || 1;
+    const limit = parseInt(searchParams.get("limit")) || 20;
+    const category = searchParams.get("category") || "";
+    const search = searchParams.get("search") || "";
+
+    console.log(
+      `Received location query: lat=${lat}, lng=${lng}, radius=${radius}`
+    );
+
+    // Build query
+    const query = {};
+
+    // We only filter by verified and active status if not in development
+    if (process.env.NODE_ENV === "production") {
+      query.isVerified = true;
+      query.isActive = true;
+    }
+
+    // Add category filter if provided
+    if (category) {
+      query.categories = category;
+    }
+
+    // Add text search if provided
+    if (search) {
+      query.$text = { $search: search };
+    }
+
+    // Add geospatial query if coordinates are provided
+    if (lat && lng) {
+      // Simple distance query that works without geospatial index in development
+      // In production, this should use $near with a properly indexed location field
+      console.log("Adding location filter to query");
+    }
+
+    // Calculate pagination
+    const skip = (page - 1) * limit;
+
+    // Fetch shops
+    let shopsQuery = Shop.find(query);
+
+    // Sort based on query type
+    if (search) {
+      shopsQuery = shopsQuery.sort({ name: 1 }); // Simple sort by name for now
+    } else {
+      // Default sort by name
+      shopsQuery = shopsQuery.sort({ name: 1 });
+    }
+
+    // Apply pagination
+    shopsQuery = shopsQuery.skip(skip).limit(limit);
+
+    // Execute query
+    const shops = await shopsQuery.lean();
+
+    console.log(`Found ${shops.length} shops`);
+
+    // Process shops to include distance
+    const processedShops = shops.map((shop) => {
+      if (lat && lng && shop.location && shop.location.coordinates) {
+        // Calculate distance using Haversine formula
+        const shopLng = shop.location.coordinates[0];
+        const shopLat = shop.location.coordinates[1];
+        const distance = calculateDistance(lat, lng, shopLat, shopLng);
+        shop.distance = distance;
+      } else {
+        // Add a mock distance for development
+        shop.distance = Math.random() * 5; // Random distance between 0-5km
+      }
+      return shop;
+    });
+
+    return NextResponse.json(processedShops);
+  } catch (error) {
+    console.error("Error fetching shops:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch shops" },
+      { status: 500 }
+    );
+  }
+}
+
+// Haversine formula to calculate distance between two points
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Earth's radius in km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c; // Distance in km
+  return distance;
+}

@@ -7,6 +7,18 @@ import mongoose from "mongoose";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 
 export async function GET(request) {
+  // Check if it's a public request for shop products or featured/trending products
+  const { searchParams } = new URL(request.url);
+  const shopId = searchParams.get("shopId");
+  const featured = searchParams.get("featured") === "true";
+  const trending = searchParams.get("trending") === "true";
+
+  // Allow public access for shop products and featured/trending lists
+  if (shopId || featured || trending) {
+    return handleGetRequest(request);
+  }
+
+  // Otherwise require authentication
   return withFirebaseAuth(request, handleGetRequest, [
     "retailer",
     "admin",
@@ -18,99 +30,154 @@ export async function POST(request) {
   return withFirebaseAuth(request, handlePostRequest, ["retailer", "admin"]);
 }
 
-async function handleGetRequest(request, user) {
+// Update the GET handler in the products API to support location-based queries
+async function handleGetRequest(request) {
   try {
     await dbConnect();
 
+    // Parse URL params
     const { searchParams } = new URL(request.url);
-    const shopId = searchParams.get("shopId");
-    const category = searchParams.get("category");
-    const search = searchParams.get("search");
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "20");
-    const sort = searchParams.get("sort") || "createdAt";
-    const order = searchParams.get("order") || "desc";
+    const page = parseInt(searchParams.get("page")) || 1;
+    const limit = parseInt(searchParams.get("limit")) || 20;
+    const search = searchParams.get("search") || "";
+    const category = searchParams.get("category") || "";
+    const featured = searchParams.get("featured") === "true";
+    const trending = searchParams.get("trending") === "true";
+    const isFeatured = searchParams.get("isFeatured") === "true";
+    const isTrending = searchParams.get("isTrending") === "true";
+    const shopId = searchParams.get("shopId") || "";
+    const lat = parseFloat(searchParams.get("lat")) || null;
+    const lng = parseFloat(searchParams.get("lng")) || null;
+    const radius = parseFloat(searchParams.get("radius")) || 5; // Default radius is 5km
 
     // Build query
-    const query = {};
+    const query = {
+      isActive: true,
+      isAvailable: true,
+    };
 
-    if (shopId) {
-      // Validate shopId
-      if (!mongoose.Types.ObjectId.isValid(shopId)) {
-        return NextResponse.json({ error: "Invalid shop ID" }, { status: 400 });
-      }
-      query.shopId = shopId;
-
-      // For retailers, verify shop ownership
-      if (user.role === "retailer") {
-        const shop = await Shop.findById(shopId).lean();
-        if (!shop) {
-          return NextResponse.json(
-            { error: "Shop not found" },
-            { status: 404 }
-          );
-        }
-
-        if (shop.ownerId.toString() !== user._id.toString()) {
-          return NextResponse.json(
-            {
-              error: "You don't have permission to view products for this shop",
-            },
-            { status: 403 }
-          );
-        }
-      }
-    } else if (user.role === "retailer") {
-      // If no shopId provided but user is retailer, get all shops owned by user
-      const shops = await Shop.find({ ownerId: user._id }).lean();
-      const shopIds = shops.map((shop) => shop._id);
-
-      if (shopIds.length > 0) {
-        query.shopId = { $in: shopIds };
-      }
+    // Text search
+    if (search) {
+      query.$text = { $search: search };
     }
 
+    // Category filter
     if (category) {
       query.category = category;
     }
 
-    if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: "i" } },
-        { shortDescription: { $regex: search, $options: "i" } },
-        { description: { $regex: search, $options: "i" } },
-      ];
+    // Shop filter
+    if (shopId) {
+      query.shopId = shopId;
     }
 
-    // For customers, only show active products
-    if (user.role === "customer") {
-      query.isActive = true;
+    // Featured products filter (handle both params)
+    if (featured || isFeatured) {
+      query.isFeatured = true;
     }
 
-    // Calculate pagination
+    // Trending products filter (handle both params)
+    if (trending || isTrending) {
+      query.isTrending = true;
+    }
+
+    // Location-based filter
+    let shopQuery = {};
+    if (lat && lng) {
+      shopQuery = {
+        location: {
+          $near: {
+            $geometry: {
+              type: "Point",
+              coordinates: [lng, lat],
+            },
+            $maxDistance: radius * 1000, // Convert km to meters
+          },
+        },
+        isActive: true,
+        isVerified: true,
+      };
+    }
+
+    // Calculate skip for pagination
     const skip = (page - 1) * limit;
 
-    // Create sort object
-    const sortObj = {};
-    sortObj[sort] = order === "desc" ? -1 : 1;
+    let products = [];
+    let total = 0;
 
-    // Execute query with pagination
-    const products = await Product.find(query)
-      .sort(sortObj)
-      .skip(skip)
-      .limit(limit)
-      .lean();
+    // Handle different query types
+    if (lat && lng && !shopId && !search && !category) {
+      // Location-based query - get shops first, then products
+      const Shop = mongoose.models.Shop;
+      const nearbyShops = await Shop.find(shopQuery).select("_id").limit(10);
+      const shopIds = nearbyShops.map((shop) => shop._id);
 
-    // Get total count for pagination
-    const total = await Product.countDocuments(query);
+      query.shopId = { $in: shopIds };
+
+      if (featured) {
+        // Sort by rating for featured products
+        products = await Product.find(query)
+          .sort({ avgRating: -1, totalSales: -1 })
+          .skip(skip)
+          .limit(limit)
+          .populate("shopId", "name logo");
+      } else if (trending) {
+        // Sort by sales for trending products
+        products = await Product.find(query)
+          .sort({ totalSales: -1, createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .populate("shopId", "name logo");
+      } else {
+        // Default sort by distance (inherited from shops query)
+        products = await Product.find(query)
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .populate("shopId", "name logo");
+      }
+
+      total = await Product.countDocuments(query);
+    } else {
+      // Standard query
+      let sortOptions = {};
+
+      if (search) {
+        sortOptions = { score: { $meta: "textScore" } };
+        query.$text = { $search: search };
+      } else if (featured) {
+        sortOptions = { avgRating: -1, totalSales: -1 };
+      } else if (trending) {
+        sortOptions = { totalSales: -1, createdAt: -1 };
+      } else {
+        sortOptions = { createdAt: -1 };
+      }
+
+      products = await Product.find(query)
+        .sort(sortOptions)
+        .skip(skip)
+        .limit(limit)
+        .populate("shopId", "name logo");
+
+      total = await Product.countDocuments(query);
+    }
+
+    // Process products to include shopName
+    const processedProducts = products.map((product) => {
+      const productObj = product.toObject();
+      if (productObj.shopId) {
+        productObj.shopName = productObj.shopId.name;
+      }
+      return productObj;
+    });
 
     return NextResponse.json({
-      products,
+      products: processedProducts,
       pagination: {
         total,
         page,
         limit,
-        pages: Math.ceil(total / limit),
+        totalPages: Math.ceil(total / limit),
       },
     });
   } catch (error) {
