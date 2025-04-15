@@ -191,6 +191,7 @@ async function handleGetRequest(request) {
 
 async function handlePostRequest(request, user) {
   try {
+    console.log("[DEBUG] Starting product creation process");
     await dbConnect();
 
     // Parse the form data from the request
@@ -198,6 +199,7 @@ async function handlePostRequest(request, user) {
 
     // Get the shop ID
     const shopId = formData.get("shopId");
+    console.log(`[DEBUG] Processing product creation for shop: ${shopId}`);
 
     if (!shopId || !mongoose.Types.ObjectId.isValid(shopId)) {
       return NextResponse.json({ error: "Invalid shop ID" }, { status: 400 });
@@ -253,11 +255,14 @@ async function handlePostRequest(request, user) {
       tags: formData.get("tags") ? JSON.parse(formData.get("tags")) : [],
     };
 
+    console.log(`[DEBUG] Product data prepared: ${productData.name}`);
+
     // Handle variants
     const hasVariants = formData.get("hasVariants") === "true";
     productData.hasVariants = hasVariants;
 
     if (hasVariants) {
+      console.log(`[DEBUG] Product has variants`);
       const variantTypesJson = formData.get("variantTypes");
       if (variantTypesJson) {
         try {
@@ -282,8 +287,22 @@ async function handlePostRequest(request, user) {
 
           // Initialize empty variants array
           productData.variants = [];
+
+          // Get variant data if available
+          const variantsJson = formData.get("variants");
+          if (variantsJson) {
+            try {
+              const variants = JSON.parse(variantsJson);
+              productData.variants = variants;
+              console.log(
+                `[DEBUG] Parsed ${variants.length} variants from form data`
+              );
+            } catch (e) {
+              console.error("[ERROR] Error parsing variants:", e);
+            }
+          }
         } catch (e) {
-          console.error("Error parsing variant types:", e);
+          console.error("[ERROR] Error parsing variant types:", e);
         }
       }
     }
@@ -298,7 +317,7 @@ async function handlePostRequest(request, user) {
         try {
           productData.preBookConfig = JSON.parse(preBookConfigJson);
         } catch (e) {
-          console.error("Error parsing pre-book config:", e);
+          console.error("[ERROR] Error parsing pre-book config:", e);
         }
       }
     }
@@ -313,49 +332,283 @@ async function handlePostRequest(request, user) {
         try {
           productData.preBuyConfig = JSON.parse(preBuyConfigJson);
         } catch (e) {
-          console.error("Error parsing pre-buy config:", e);
+          console.error("[ERROR] Error parsing pre-buy config:", e);
         }
       }
     }
 
-    // Handle image uploads
+    // CRITICAL FIX: Handle main product image uploads
+    console.log("[DEBUG] Starting image processing");
     const imageFiles = formData.getAll("images");
+    console.log(
+      `[DEBUG] Found ${imageFiles.length} image files in the form data`
+    );
+
     const images = [];
 
+    // Process image files
     if (imageFiles && imageFiles.length > 0) {
-      for (const file of imageFiles) {
-        if (file.size > 0) {
-          const uniqueId = `product_${Date.now()}_${Math.random()
-            .toString(36)
-            .substring(2, 15)}`;
+      for (let i = 0; i < imageFiles.length; i++) {
+        const file = imageFiles[i];
+        if (file && file.size > 0) {
           try {
-            const result = await uploadToCloudinary(
-              file,
-              "locallens/products",
-              uniqueId
+            console.log(
+              `[DEBUG] Processing image file ${i + 1}/${
+                imageFiles.length
+              }: size=${file.size}, type=${file.type}`
             );
+            // Create a unique ID based on timestamp and random string
+            const timestamp = Date.now();
+            const randomString = Math.random().toString(36).substring(2, 15);
+            const uniqueId = `product_${timestamp}_${randomString}`;
+
+            // DIRECT CLOUDINARY UPLOAD - bypassing our uploadToCloudinary function
+            // This is a workaround to debug the issue
+            const cloudinaryFormData = new FormData();
+            cloudinaryFormData.append("file", file);
+            cloudinaryFormData.append("folder", "locallens/products");
+            cloudinaryFormData.append("public_id", uniqueId);
+            cloudinaryFormData.append(
+              "upload_preset",
+              process.env.CLOUDINARY_UPLOAD_PRESET || "locallens_unsigned"
+            );
+
+            console.log(
+              `[DEBUG] Preparing direct Cloudinary upload with preset: ${
+                process.env.CLOUDINARY_UPLOAD_PRESET || "locallens_unsigned"
+              }`
+            );
+
+            // Directly call Cloudinary's API
+            const cloudinaryResponse = await fetch(
+              `https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/upload`,
+              {
+                method: "POST",
+                body: cloudinaryFormData,
+              }
+            );
+
+            if (!cloudinaryResponse.ok) {
+              const errorText = await cloudinaryResponse.text();
+              console.error(
+                `[ERROR] Direct Cloudinary upload failed: ${errorText}`
+              );
+              throw new Error(`Cloudinary upload failed: ${errorText}`);
+            }
+
+            const result = await cloudinaryResponse.json();
+            console.log(
+              `[DEBUG] Successfully uploaded image ${
+                i + 1
+              } directly to Cloudinary: ${result.secure_url}`
+            );
+
             images.push({
               url: result.secure_url,
               publicId: result.public_id,
-              alt: formData.get("name") || "Product Image",
+              alt: productData.name || "Product Image",
               isDefault: images.length === 0, // First image is the default
             });
           } catch (err) {
-            console.error("Image upload failed:", err);
+            console.error(`[ERROR] Image ${i + 1} upload failed:`, err);
           }
+        } else {
+          console.log(
+            `[DEBUG] Skipping empty or invalid image file at index ${i}`
+          );
+        }
+      }
+    } else {
+      console.log("[DEBUG] No image files found in form data");
+    }
+
+    // Process any image URLs that might be passed directly
+    const imageUrls = formData.getAll("imageUrls");
+    console.log(
+      `[DEBUG] Found ${imageUrls.length} direct image URLs in form data`
+    );
+
+    if (imageUrls && imageUrls.length > 0) {
+      for (let i = 0; i < imageUrls.length; i++) {
+        const url = imageUrls[i];
+        if (url && typeof url === "string" && url.trim() !== "") {
+          console.log(
+            `[DEBUG] Processing direct image URL ${i + 1}: ${url.substring(
+              0,
+              50
+            )}...`
+          );
+          images.push({
+            url: url,
+            alt: productData.name || "Product Image",
+            isDefault: images.length === 0, // First image is the default
+          });
         }
       }
     }
 
+    console.log(`[DEBUG] Total images processed: ${images.length}`);
     productData.images = images;
 
-    // Create product
-    const product = new Product(productData);
-    await product.save();
+    // Handle variant image uploads if there are variants
+    if (
+      hasVariants &&
+      productData.variants &&
+      productData.variants.length > 0
+    ) {
+      console.log(
+        `[DEBUG] Processing variant images for ${productData.variants.length} variants`
+      );
 
-    return NextResponse.json(product, { status: 201 });
+      // Create a map to store variant images by index
+      const variantImagesMap = new Map();
+
+      // Process variant images from form data
+      const variantImageFiles = formData.getAll("variantImages");
+      const variantIndexes = formData.getAll("variantImageIndex");
+
+      console.log(
+        `[DEBUG] Found ${variantImageFiles.length} variant image files with ${variantIndexes.length} indexes`
+      );
+
+      // Upload all variant images
+      for (let i = 0; i < variantImageFiles.length; i++) {
+        const file = variantImageFiles[i];
+        const variantIndex = variantIndexes[i] || "0";
+
+        if (file && file.size > 0) {
+          try {
+            console.log(
+              `[DEBUG] Processing variant image ${
+                i + 1
+              } for variant index ${variantIndex}`
+            );
+            const uniqueId = `variant_${Date.now()}_${Math.random()
+              .toString(36)
+              .substring(2, 15)}`;
+
+            const result = await uploadToCloudinary(
+              file,
+              "locallens/variants",
+              uniqueId
+            );
+
+            if (result && result.secure_url) {
+              // Initialize array for this variant if not already present
+              if (!variantImagesMap.has(variantIndex)) {
+                variantImagesMap.set(variantIndex, []);
+              }
+
+              // Add image to the variant's images array
+              variantImagesMap.get(variantIndex).push({
+                url: result.secure_url,
+                publicId: result.public_id,
+                alt: `${productData.name} Variant` || "Variant Image",
+                isDefault: variantImagesMap.get(variantIndex).length === 0, // First image is default
+              });
+
+              console.log(
+                `[DEBUG] Successfully uploaded variant image: ${result.secure_url}`
+              );
+            }
+          } catch (err) {
+            console.error(
+              `[ERROR] Variant image upload failed for variant ${variantIndex}:`,
+              err
+            );
+          }
+        }
+      }
+
+      // Process any direct variant image URLs
+      const variantImageUrls = formData.getAll("variantImageUrls");
+      const variantUrlIndexes = formData.getAll("variantUrlIndex");
+
+      console.log(
+        `[DEBUG] Found ${variantImageUrls.length} direct variant image URLs`
+      );
+
+      for (let i = 0; i < variantImageUrls.length; i++) {
+        const url = variantImageUrls[i];
+        const variantIndex = variantUrlIndexes[i] || "0";
+
+        if (url && typeof url === "string" && url.trim() !== "") {
+          console.log(
+            `[DEBUG] Processing direct variant image URL for variant ${variantIndex}: ${url.substring(
+              0,
+              50
+            )}...`
+          );
+
+          // Initialize array for this variant if not already present
+          if (!variantImagesMap.has(variantIndex)) {
+            variantImagesMap.set(variantIndex, []);
+          }
+
+          // Add image URL to the variant's images array
+          variantImagesMap.get(variantIndex).push({
+            url: url,
+            alt: `${productData.name} Variant` || "Variant Image",
+            isDefault: variantImagesMap.get(variantIndex).length === 0, // First image is default
+          });
+        }
+      }
+
+      // Assign images to their respective variants
+      console.log(
+        `[DEBUG] Assigning images to variants: ${variantImagesMap.size} variant indexes with images`
+      );
+      for (const [index, images] of variantImagesMap.entries()) {
+        const idx = parseInt(index, 10);
+        if (idx >= 0 && idx < productData.variants.length) {
+          productData.variants[idx].images = images;
+          console.log(
+            `[DEBUG] Assigned ${images.length} images to variant ${idx}`
+          );
+        }
+      }
+
+      // If no specific variant images were uploaded, use main product images for all variants
+      if (variantImagesMap.size === 0 && images.length > 0) {
+        console.log(
+          `[DEBUG] No variant-specific images found, using main product images for all variants`
+        );
+        for (let i = 0; i < productData.variants.length; i++) {
+          productData.variants[i].images = [...images];
+          console.log(
+            `[DEBUG] Assigned ${images.length} main product images to variant ${i}`
+          );
+        }
+      }
+    }
+
+    // Create product
+    console.log(
+      `[DEBUG] Creating product in database with ${productData.images.length} images`
+    );
+    console.log(`[DEBUG] Product data preview:`, {
+      name: productData.name,
+      imageCount: productData.images.length,
+      variantCount: productData.variants?.length || 0,
+    });
+
+    const product = new Product(productData);
+    const savedProduct = await product.save();
+
+    console.log(`[DEBUG] Product created successfully: ${savedProduct._id}`);
+    console.log(
+      `[DEBUG] Saved product has ${savedProduct.images.length} images and ${
+        savedProduct.variants?.length || 0
+      } variants`
+    );
+
+    if (savedProduct.images.length === 0) {
+      console.warn("[WARN] Product was saved but has no images!");
+    }
+
+    return NextResponse.json(savedProduct, { status: 201 });
   } catch (error) {
-    console.error("Error creating product:", error);
+    console.error("[ERROR] Error creating product:", error);
     return NextResponse.json(
       { error: "Failed to create product: " + error.message },
       { status: 500 }

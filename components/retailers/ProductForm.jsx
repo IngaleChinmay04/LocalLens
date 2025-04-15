@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -12,7 +12,64 @@ import {
   Tag,
   Calendar,
   Info,
+  Upload,
 } from "lucide-react";
+
+// Add a direct Cloudinary upload helper function
+async function uploadToCloudinaryDirectly(file) {
+  console.log(`[DEBUG] Direct upload to Cloudinary: ${file.name}`);
+
+  try {
+    // Create a FormData object
+    const formData = new FormData();
+    formData.append("file", file);
+
+    // Check if we have a preset available, if not use a default
+    const uploadPreset =
+      process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "locallens_unsigned";
+    formData.append("upload_preset", uploadPreset);
+
+    // Add folder setting for organization
+    formData.append("folder", "locallens/products");
+
+    // Generate a unique ID for the file
+    const uniqueId = `product_${Date.now()}_${Math.random()
+      .toString(36)
+      .substring(2, 7)}`;
+    formData.append("public_id", uniqueId);
+
+    console.log(
+      `[DEBUG] Uploading with preset: ${uploadPreset}, public_id: ${uniqueId}`
+    );
+
+    // Get cloud name or use a default for testing
+    const cloudName =
+      process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "YOUR_CLOUD_NAME";
+    const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
+
+    console.log(`[DEBUG] Uploading to: ${cloudinaryUrl}`);
+
+    // Make the upload request
+    const response = await fetch(cloudinaryUrl, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[ERROR] Cloudinary upload failed: ${errorText}`);
+      throw new Error(`Upload failed: ${errorText}`);
+    }
+
+    // Parse and return the result
+    const result = await response.json();
+    console.log(`[DEBUG] Upload successful: ${result.secure_url}`);
+    return result;
+  } catch (error) {
+    console.error(`[ERROR] Upload error:`, error);
+    throw error;
+  }
+}
 
 export default function ProductForm({ product, shopId, isEditing = false }) {
   const { getIdToken } = useAuth();
@@ -251,12 +308,20 @@ export default function ProductForm({ product, shopId, isEditing = false }) {
     const files = Array.from(e.target.files);
     if (!files.length) return;
 
+    console.log(`[DEBUG] Selected ${files.length} image files for upload`);
+
     // Store the file objects for later upload
     setImageFiles((prev) => [...prev, ...files]);
 
     // Create preview URLs
     const newPreviews = files.map((file) => URL.createObjectURL(file));
     setImagePreview((prev) => [...prev, ...newPreviews]);
+
+    console.log(
+      `[DEBUG] Total image files ready for upload: ${
+        imageFiles.length + files.length
+      }`
+    );
   };
 
   const removeImage = (index) => {
@@ -316,6 +381,43 @@ export default function ProductForm({ product, shopId, isEditing = false }) {
       const token = await getIdToken();
       if (!token) {
         throw new Error("Authentication token not available");
+      }
+
+      // CRITICAL FIX: Upload images to Cloudinary directly before submitting the form
+      console.log(
+        `[DEBUG] Starting direct Cloudinary upload for ${imageFiles.length} images`
+      );
+
+      // Array to store Cloudinary URLs from successful uploads
+      const cloudinaryUrls = [];
+
+      // Process each image file
+      if (imageFiles.length > 0) {
+        for (let i = 0; i < imageFiles.length; i++) {
+          try {
+            const file = imageFiles[i];
+            console.log(
+              `[DEBUG] Uploading image ${i + 1}/${imageFiles.length}: ${
+                file.name
+              }`
+            );
+
+            // Use our direct upload function
+            const result = await uploadToCloudinaryDirectly(file);
+
+            if (result && result.secure_url) {
+              console.log(`[DEBUG] Upload successful: ${result.secure_url}`);
+              cloudinaryUrls.push(result.secure_url);
+            } else {
+              console.error(`[ERROR] Upload returned without a secure_url`);
+            }
+          } catch (uploadError) {
+            console.error(
+              `[ERROR] Failed to upload image ${i + 1}:`,
+              uploadError
+            );
+          }
+        }
       }
 
       // Prepare form data
@@ -378,19 +480,34 @@ export default function ProductForm({ product, shopId, isEditing = false }) {
         }
       }
 
-      // Add new image files
-      imageFiles.forEach((file) => {
-        productFormData.append("images", file);
-      });
+      // CRITICAL FIX: Include the Cloudinary URLs we got from direct uploads
+      console.log(
+        `[DEBUG] Adding ${cloudinaryUrls.length} Cloudinary URLs to form data`
+      );
+      for (const url of cloudinaryUrls) {
+        productFormData.append("imageUrls", url);
+      }
 
       // Make sure we're explicitly adding isActive to the form data
       productFormData.append("isActive", formData.isActive);
 
+      // Log form data entries to debug
+      console.log("[DEBUG] Form data contents:");
+      for (let [key, value] of productFormData.entries()) {
+        if (key === "images") {
+          console.log(
+            `[DEBUG] FormData entry: ${key} = [File object], size: ${value.size}`
+          );
+        } else {
+          console.log(`[DEBUG] FormData entry: ${key} = ${value}`);
+        }
+      }
+
       // Make API request to create/update product
       const url = isEditing ? `/api/products/${product._id}` : "/api/products";
-
       const method = isEditing ? "PUT" : "POST";
 
+      console.log(`[DEBUG] Making ${method} request to ${url}`);
       const response = await fetch(url, {
         method,
         headers: {
@@ -399,14 +516,25 @@ export default function ProductForm({ product, shopId, isEditing = false }) {
         body: productFormData,
       });
 
-      toast.dismiss(toastId);
-
       if (!response.ok) {
         const error = await response.json();
+        console.error(
+          `[ERROR] API request failed: ${error.error || "Unknown error"}`
+        );
         throw new Error(error.error || "Failed to save product");
       }
 
       const savedProduct = await response.json();
+      console.log(`[DEBUG] Product saved successfully: ${savedProduct._id}`);
+      console.log(
+        `[DEBUG] Saved product has ${savedProduct.images?.length || 0} images`
+      );
+
+      if (savedProduct.images?.length === 0) {
+        console.warn("[WARN] Product saved but has no images!");
+      }
+
+      toast.dismiss(toastId);
 
       // If product has variants, create the variants for each combination
       if (
@@ -444,7 +572,7 @@ export default function ProductForm({ product, shopId, isEditing = false }) {
         router.push(`/retailer/products?shopId=${selectedShop || shopId}`);
       }, 1000);
     } catch (error) {
-      console.error("Error saving product:", error);
+      console.error("[ERROR] Error saving product:", error);
       toast.error(error.message || "Error saving product");
     } finally {
       setIsLoading(false);

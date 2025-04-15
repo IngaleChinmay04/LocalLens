@@ -3,6 +3,7 @@ import dbConnect from "@/lib/dbConnect";
 import Shop from "@/models/Shop.model";
 import User from "@/models/User.model";
 import { withFirebaseAuth } from "@/middleware/firebase-auth";
+import { uploadToCloudinary } from "@/lib/cloudinary";
 
 export async function POST(request) {
   return withFirebaseAuth(request, handlePostRequest, ["customer", "retailer"]);
@@ -18,25 +19,75 @@ async function handlePostRequest(request, user) {
     // Use the authenticated user from Firebase middleware
     const userId = user._id;
 
-    // Process logo upload if it exists
+    console.log("[DEBUG] Processing shop registration data");
+
+    // Process logo URL
     let logoUrl = null;
-    const logoFile = formData.get("logo");
-    if (logoFile && logoFile.size > 0) {
-      // For development purposes, store a placeholder URL
-      // In production, this should be replaced with actual image upload logic
-      logoUrl =
-        formData.get("logoUrl") ||
-        "https://placeholder.com/shop_logo_" + Date.now();
+
+    // CRITICAL FIX: First check for the direct URL from the frontend
+    if (formData.has("logoUrl")) {
+      logoUrl = formData.get("logoUrl");
+      console.log(`[DEBUG] Found direct logo URL from frontend: ${logoUrl}`);
+    } else {
+      console.log("[DEBUG] No direct logo URL found, checking for logo file");
+      // Fallback to file upload if no URL was provided
+      const logoFile = formData.get("logo");
+      if (logoFile && logoFile.size > 0) {
+        try {
+          console.log(
+            `[DEBUG] Found logo file of size ${logoFile.size}, uploading to Cloudinary`
+          );
+          const uniqueId = `shop_logo_${Date.now()}`;
+          const result = await uploadToCloudinary(
+            logoFile,
+            "locallens/shop-logos",
+            uniqueId
+          );
+          logoUrl = result.secure_url;
+          console.log(`[DEBUG] Successfully uploaded logo: ${logoUrl}`);
+        } catch (error) {
+          console.error("[ERROR] Error uploading logo to Cloudinary:", error);
+        }
+      }
     }
 
-    // Process verification document upload if it exists
+    // Process verification document URL
     let verificationDocUrl = null;
-    const verificationDocFile = formData.get("verificationDocument");
-    if (verificationDocFile && verificationDocFile.size > 0) {
-      // In production, this should be replaced with actual document upload logic
-      verificationDocUrl =
-        formData.get("verificationDocumentUrl") ||
-        "https://placeholder.com/verification_doc_" + Date.now();
+
+    // CRITICAL FIX: First check for the direct URL from the frontend
+    if (formData.has("verificationDocumentUrl")) {
+      verificationDocUrl = formData.get("verificationDocumentUrl");
+      console.log(
+        `[DEBUG] Found direct verification document URL from frontend: ${verificationDocUrl}`
+      );
+    } else {
+      console.log(
+        "[DEBUG] No direct verification document URL found, checking for document file"
+      );
+      // Fallback to file upload if no URL was provided
+      const verificationDocFile = formData.get("verificationDocument");
+      if (verificationDocFile && verificationDocFile.size > 0) {
+        try {
+          console.log(
+            `[DEBUG] Found verification document of size ${verificationDocFile.size}, uploading to Cloudinary`
+          );
+          const uniqueId = `verification_${Date.now()}`;
+          const result = await uploadToCloudinary(
+            verificationDocFile,
+            "locallens/verification-docs",
+            uniqueId
+          );
+          verificationDocUrl = result.secure_url;
+          console.log(
+            `[DEBUG] Successfully uploaded verification document: ${verificationDocUrl}`
+          );
+        } catch (error) {
+          console.error(
+            "[ERROR] Error uploading verification document to Cloudinary:",
+            error
+          );
+        }
+      }
     }
 
     // Get categories array
@@ -77,6 +128,8 @@ async function handlePostRequest(request, user) {
       name: shopData.name,
       ownerId: shopData.ownerId,
       contactEmail: shopData.contactEmail,
+      logoUrl: shopData.logo, // CRITICAL FIX: Log the logo URL
+      verificationDocumentUrl: shopData.verificationDocument, // CRITICAL FIX: Log the verification document URL
     });
 
     // Create the shop in the database

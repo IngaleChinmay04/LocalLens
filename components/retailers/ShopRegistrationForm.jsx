@@ -6,6 +6,62 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { toast } from "react-hot-toast";
 import { uploadToCloudinaryViaAPI } from "@/lib/cloudinaryClient";
 
+// Add direct Cloudinary upload function
+async function uploadToCloudinaryDirectly(file, folder) {
+  console.log(`[DEBUG] Direct upload to Cloudinary for shop: ${file.name}`);
+
+  try {
+    // Create a FormData object
+    const formData = new FormData();
+    formData.append("file", file);
+
+    // Check if we have a preset available, if not use a default
+    const uploadPreset =
+      process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "locallens_unsigned";
+    formData.append("upload_preset", uploadPreset);
+
+    // Add folder setting for organization
+    formData.append("folder", folder);
+
+    // Generate a unique ID for the file
+    const uniqueId = `shop_${Date.now()}_${Math.random()
+      .toString(36)
+      .substring(2, 7)}`;
+    formData.append("public_id", uniqueId);
+
+    console.log(
+      `[DEBUG] Uploading shop image with preset: ${uploadPreset}, public_id: ${uniqueId}`
+    );
+
+    // Get cloud name or use a default for testing
+    const cloudName =
+      process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "YOUR_CLOUD_NAME";
+    const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
+
+    console.log(`[DEBUG] Uploading to: ${cloudinaryUrl}`);
+
+    // Make the upload request
+    const response = await fetch(cloudinaryUrl, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[ERROR] Cloudinary upload failed: ${errorText}`);
+      throw new Error(`Upload failed: ${errorText}`);
+    }
+
+    // Parse and return the result
+    const result = await response.json();
+    console.log(`[DEBUG] Upload successful: ${result.secure_url}`);
+    return result;
+  } catch (error) {
+    console.error(`[ERROR] Upload error:`, error);
+    throw error;
+  }
+}
+
 export default function ShopRegistrationForm() {
   const router = useRouter();
   const { mongoUser, user, getIdToken } = useAuth();
@@ -153,36 +209,68 @@ export default function ShopRegistrationForm() {
       let logoUrl = "";
       let verificationDocUrl = "";
 
+      console.log("[DEBUG] Starting direct Cloudinary uploads for shop images");
+
+      // DIRECT UPLOAD: Upload logo to Cloudinary if present
       if (formData.logo) {
-        const uniqueId = `${formData.name
-          .replace(/\s+/g, "-")
-          .toLowerCase()}-${Date.now()}`;
-        const result = await uploadToCloudinaryViaAPI(
-          formData.logo,
-          "locallens/shop-logos",
-          uniqueId,
-          getIdToken // Pass your getIdToken function from useAuth
-        );
-        logoUrl = result.secure_url;
+        try {
+          console.log(`[DEBUG] Uploading shop logo: ${formData.logo.name}`);
+          const result = await uploadToCloudinaryDirectly(
+            formData.logo,
+            "locallens/shop-logos"
+          );
+
+          if (result && result.secure_url) {
+            logoUrl = result.secure_url;
+            console.log(`[DEBUG] Logo uploaded successfully: ${logoUrl}`);
+          } else {
+            console.error("[ERROR] Logo upload returned no URL");
+          }
+        } catch (logoError) {
+          console.error("[ERROR] Failed to upload logo:", logoError);
+          toast.error("Failed to upload shop logo. Please try again.");
+        }
       }
 
+      // DIRECT UPLOAD: Upload verification document to Cloudinary
       if (formData.verificationDocument) {
-        const uniqueId = `verification-${formData.gstin.replace(
-          /[^a-zA-Z0-9]/g,
-          ""
-        )}-${Date.now()}`;
-        const result = await uploadToCloudinaryViaAPI(
-          formData.verificationDocument,
-          "locallens/verification-docs",
-          uniqueId,
-          getIdToken
-        );
-        verificationDocUrl = result.secure_url;
+        try {
+          console.log(
+            `[DEBUG] Uploading verification document: ${formData.verificationDocument.name}`
+          );
+          const result = await uploadToCloudinaryDirectly(
+            formData.verificationDocument,
+            "locallens/verification-docs"
+          );
+
+          if (result && result.secure_url) {
+            verificationDocUrl = result.secure_url;
+            console.log(
+              `[DEBUG] Verification document uploaded successfully: ${verificationDocUrl}`
+            );
+          } else {
+            console.error(
+              "[ERROR] Verification document upload returned no URL"
+            );
+          }
+        } catch (docError) {
+          console.error(
+            "[ERROR] Failed to upload verification document:",
+            docError
+          );
+          toast.error(
+            "Failed to upload verification document. Please try again."
+          );
+          // Don't return here, we want to allow submission even if doc upload fails
+        }
       }
 
       // Append Cloudinary URLs
       formDataToSend.append("logoUrl", logoUrl);
       formDataToSend.append("verificationDocumentUrl", verificationDocUrl);
+
+      console.log(`[DEBUG] Logo URL: ${logoUrl}`);
+      console.log(`[DEBUG] Verification document URL: ${verificationDocUrl}`);
 
       // Append arrays correctly
       formData.categories.forEach((category) => {
@@ -205,6 +293,7 @@ export default function ShopRegistrationForm() {
         throw new Error("Authentication token not available");
       }
 
+      console.log("[DEBUG] Sending shop registration request to API");
       const response = await fetch("/api/shops", {
         method: "POST",
         headers: {
@@ -217,11 +306,12 @@ export default function ShopRegistrationForm() {
 
       if (!response.ok) {
         const errorData = await response.json();
+        console.error("[ERROR] Shop registration API error:", errorData);
         throw new Error(errorData.error || "Failed to register shop");
       }
 
       const result = await response.json();
-      console.log("Shop registration successful:", result);
+      console.log("[DEBUG] Shop registration successful:", result);
 
       toast.success("Shop registration submitted successfully!");
       // Wait a moment before redirecting
@@ -230,10 +320,10 @@ export default function ShopRegistrationForm() {
       }, 1500);
     } catch (error) {
       toast.dismiss(toastId);
+      console.error("[ERROR] Shop registration error:", error);
       toast.error(
         error.message || "An error occurred during shop registration"
       );
-      console.error("Shop registration error:", error);
     } finally {
       setIsLoading(false);
     }

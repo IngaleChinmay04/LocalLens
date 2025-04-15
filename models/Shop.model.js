@@ -109,6 +109,11 @@ const ShopSchema = new mongoose.Schema(
     verificationDate: {
       type: Date,
     },
+    // Add explicit verification document field
+    verificationDocument: {
+      type: String, // URL to the verification document in Cloudinary
+      default: null,
+    },
     registrationNumber: {
       type: String,
       trim: true,

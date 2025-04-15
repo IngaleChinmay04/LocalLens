@@ -16,6 +16,8 @@ export async function POST(request) {
 
 async function handlePostRequest(request, user) {
   try {
+    console.log("[DEBUG] Starting Cloudinary upload process");
+
     // With App Router, we need to use the ReadableStream API
     const formData = await request.formData();
 
@@ -24,8 +26,28 @@ async function handlePostRequest(request, user) {
     const folder = formData.get("folder") || "locallens";
     const publicId = formData.get("publicId") || `${folder}/${Date.now()}`;
 
+    console.log(
+      `[DEBUG] Upload request: folder=${folder}, file present=${!!file}, type=${
+        file?.type
+      }`
+    );
+
     if (!file) {
+      console.log("[ERROR] No file provided in upload request");
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    }
+
+    // Verify Cloudinary configuration
+    if (
+      !process.env.CLOUDINARY_CLOUD_NAME ||
+      !process.env.CLOUDINARY_API_KEY ||
+      !process.env.CLOUDINARY_API_SECRET
+    ) {
+      console.error("[ERROR] Cloudinary configuration missing");
+      return NextResponse.json(
+        { error: "Cloudinary configuration missing" },
+        { status: 500 }
+      );
     }
 
     // Convert the file to a buffer
@@ -33,8 +55,16 @@ async function handlePostRequest(request, user) {
     const base64String = Buffer.from(buffer).toString("base64");
     const dataURI = `data:${file.type};base64,${base64String}`;
 
+    console.log(
+      `[DEBUG] Prepared file for upload: size=${buffer.byteLength} bytes`
+    );
+
     // Upload to Cloudinary
     const result = await new Promise((resolve, reject) => {
+      console.log(
+        `[DEBUG] Initiating Cloudinary upload: folder=${folder}, publicId=${publicId}`
+      );
+
       cloudinary.uploader.upload(
         dataURI,
         {
@@ -44,8 +74,12 @@ async function handlePostRequest(request, user) {
         },
         (error, result) => {
           if (error) {
+            console.error("[ERROR] Cloudinary upload failed:", error);
             reject(error);
           } else {
+            console.log(
+              `[DEBUG] Cloudinary upload successful: url=${result.secure_url}`
+            );
             resolve(result);
           }
         }
@@ -54,7 +88,13 @@ async function handlePostRequest(request, user) {
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error("Error uploading to Cloudinary:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[ERROR] Error uploading to Cloudinary:", error);
+    return NextResponse.json(
+      {
+        error: error.message,
+        details: error.stack,
+      },
+      { status: 500 }
+    );
   }
 }
