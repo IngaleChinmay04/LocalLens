@@ -5,7 +5,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { Star, ShoppingCart, Heart } from "lucide-react";
 import { useCart } from "@/lib/context/CartContext";
-import { toast } from "react-hot-toast";
 
 export default function ProductCard({ product }) {
   const { addToCart } = useCart();
@@ -30,6 +29,7 @@ export default function ProductCard({ product }) {
     e.stopPropagation();
 
     const productToAdd = {
+      id: product._id,
       productId: product._id,
       name: product.name,
       shopName: product.shopName,
@@ -38,12 +38,13 @@ export default function ProductCard({ product }) {
         product.images && product.images.length > 0
           ? product.images[0].url
           : null,
+      availableQuantity: product.availableQuantity || 99,
       quantity: 1,
       shopId: product.shopId,
     };
 
     addToCart(productToAdd);
-    toast.success("Added to cart!");
+    // The notification is now handled by CartContext and displayed in CartDrawer
   };
 
   // Generate stars based on rating
@@ -95,6 +96,7 @@ export default function ProductCard({ product }) {
             fill
             className="object-cover"
             onError={handleImageError}
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-200">
@@ -124,7 +126,7 @@ export default function ProductCard({ product }) {
         >
           <button
             onClick={handleAddToCart}
-            className="p-1.5 bg-white rounded-full text-emerald-600 hover:text-emerald-700"
+            className="p-1.5 bg-white rounded-full text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
             aria-label="Add to cart"
           >
             <ShoppingCart size={16} />
@@ -134,9 +136,9 @@ export default function ProductCard({ product }) {
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              toast.success("Added to wishlist!");
+              // You could implement wishlist functionality similar to cart
             }}
-            className="p-1.5 bg-white rounded-full text-red-500 hover:text-red-600"
+            className="p-1.5 bg-white rounded-full text-red-500 hover:text-red-600 hover:bg-red-50 transition-colors"
             aria-label="Add to wishlist"
           >
             <Heart size={16} />

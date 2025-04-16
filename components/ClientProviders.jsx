@@ -1,7 +1,14 @@
 "use client";
 
-import { CartProvider } from "@/lib/context/CartContext";
+import { useEffect } from "react";
+import { CartProvider as BaseCartProvider } from "@/lib/context/CartContext";
+import CartDrawer from "@/components/cart/CartDrawer";
 
 export default function ClientProviders({ children }) {
-  return <CartProvider>{children}</CartProvider>;
+  return (
+    <BaseCartProvider>
+      <CartDrawer />
+      {children}
+    </BaseCartProvider>
+  );
 }

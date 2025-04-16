@@ -6,8 +6,9 @@ import mongoose from "mongoose";
 export async function GET(request, { params }) {
   try {
     await dbConnect();
-    // Access shopId from params.shopId correctly
-    const shopId = params.shopId;
+
+    // Get shopId from params and ensure it's properly awaited
+    const { shopId } = params;
 
     // Validate shopId format
     if (!shopId || !shopId.match(/^[0-9a-fA-F]{24}$/)) {

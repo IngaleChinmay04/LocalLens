@@ -18,13 +18,15 @@ import {
   Clock,
   ShieldCheck,
   Store,
+  CheckCircle,
+  X,
 } from "lucide-react";
 import { useCart } from "@/lib/context/CartContext";
 
 export default function ProductDetails() {
   const { productId } = useParams();
   const router = useRouter();
-  const { addToCart } = useCart();
+  const { addToCart, isCartOpen, setIsCartOpen } = useCart();
 
   const [product, setProduct] = useState(null);
   const [shop, setShop] = useState(null);
@@ -34,6 +36,7 @@ export default function ProductDetails() {
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("description"); // description, specifications, reviews
+  const [showAddedMessage, setShowAddedMessage] = useState(false);
 
   // Fetch product data
   useEffect(() => {
@@ -102,6 +105,16 @@ export default function ProductDetails() {
     }
   }, [productId]);
 
+  // Effect to auto-hide add to cart message
+  useEffect(() => {
+    if (showAddedMessage) {
+      const timer = setTimeout(() => {
+        setShowAddedMessage(false);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [showAddedMessage]);
+
   // Calculate final price based on discount and selected variant
   const calculateFinalPrice = () => {
     if (!product) return 0;
@@ -147,6 +160,7 @@ export default function ProductDetails() {
     const finalPrice = calculateFinalPrice();
 
     const cartItem = {
+      id: product._id,
       productId: product._id,
       name: product.name,
       price: finalPrice,
@@ -155,6 +169,9 @@ export default function ProductDetails() {
         product.images && product.images.length > 0
           ? product.images[0].url
           : null,
+      availableQuantity: selectedVariant
+        ? selectedVariant.availableQuantity
+        : product.availableQuantity || 99,
       shopId: product.shopId,
       shopName: product.shopName,
       variant: selectedVariant ? selectedVariant.name : null,
@@ -162,7 +179,8 @@ export default function ProductDetails() {
     };
 
     addToCart(cartItem);
-    toast.success("Added to cart!");
+    // Show the custom add to cart notification
+    setShowAddedMessage(true);
   };
 
   // Generate stars for rating
@@ -229,6 +247,34 @@ export default function ProductDetails() {
 
   return (
     <div className="bg-gray-50 min-h-screen pb-12">
+      {/* Add to Cart Notification */}
+      {showAddedMessage && (
+        <div className="fixed top-4 right-4 z-50 bg-white shadow-lg rounded-lg p-4 flex items-start space-x-3 max-w-xs animate-slide-in-right">
+          <CheckCircle className="text-emerald-500 h-5 w-5 mt-0.5" />
+          <div>
+            <h4 className="font-medium text-sm">Added to cart!</h4>
+            <p className="text-xs text-gray-500 mb-2 mt-1 line-clamp-1">
+              {product.name}
+            </p>
+            <button
+              onClick={() => {
+                setShowAddedMessage(false);
+                setIsCartOpen(true);
+              }}
+              className="text-xs font-medium text-emerald-600 hover:text-emerald-700"
+            >
+              View cart
+            </button>
+          </div>
+          <button
+            onClick={() => setShowAddedMessage(false)}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       {/* Back Button */}
       <div className="container mx-auto px-4 py-4">
         <button
@@ -279,6 +325,7 @@ export default function ProductDetails() {
                     fill
                     className="object-contain"
                     priority
+                    sizes="(max-width: 768px) 100vw, 50vw"
                   />
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center bg-gray-200">
@@ -312,6 +359,7 @@ export default function ProductDetails() {
                         alt={`${product.name} - Image ${index + 1}`}
                         fill
                         className="object-cover"
+                        sizes="64px"
                       />
                     </button>
                   ))}
@@ -682,6 +730,7 @@ export default function ProductDetails() {
                         alt={relatedProduct.name}
                         fill
                         className="object-cover"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
                       />
                     ) : (
                       <div className="absolute inset-0 flex items-center justify-center bg-gray-200">
