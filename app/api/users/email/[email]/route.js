@@ -7,11 +7,14 @@ export async function GET(req, { params }) {
   try {
     await dbConnect();
 
-    // Await params before accessing its properties
-    const paramsResolved = await params;
-    const email = decodeURIComponent(paramsResolved.email);
+    const email = params.email;
+    if (!email) {
+      return NextResponse.json({ error: "Email is required" }, { status: 400 });
+    }
 
-    const user = await User.findOne({ email }).select("-__v");
+    const user = await User.findOne({ email: email.toLowerCase() }).select(
+      "-__v"
+    );
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -27,17 +30,18 @@ export async function GET(req, { params }) {
   }
 }
 
-// Update last login
+// Update last login time
 export async function PUT(req, { params }) {
   try {
     await dbConnect();
 
-    // Await params before accessing its properties
-    const paramsResolved = await params;
-    const email = decodeURIComponent(paramsResolved.email);
+    const email = params.email;
+    if (!email) {
+      return NextResponse.json({ error: "Email is required" }, { status: 400 });
+    }
 
     const user = await User.findOneAndUpdate(
-      { email },
+      { email: email.toLowerCase() },
       { $set: { lastLogin: new Date() } },
       { new: true }
     );
@@ -46,11 +50,11 @@ export async function PUT(req, { params }) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ message: "Last login updated" });
+    return NextResponse.json(user);
   } catch (error) {
-    console.error("Error updating last login:", error);
+    console.error("Error updating user login time:", error);
     return NextResponse.json(
-      { error: "Failed to update last login" },
+      { error: "Failed to update login time" },
       { status: 500 }
     );
   }

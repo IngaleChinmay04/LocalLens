@@ -20,13 +20,17 @@ import {
   Store,
   CheckCircle,
   X,
+  Calendar,
+  AlertCircle,
 } from "lucide-react";
 import { useCart } from "@/lib/context/CartContext";
+import { useAuth } from "@/lib/context/AuthContext";
 
 export default function ProductDetails() {
   const { productId } = useParams();
   const router = useRouter();
   const { addToCart, isCartOpen, setIsCartOpen } = useCart();
+  const { user } = useAuth();
 
   const [product, setProduct] = useState(null);
   const [shop, setShop] = useState(null);
@@ -37,6 +41,7 @@ export default function ProductDetails() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("description"); // description, specifications, reviews
   const [showAddedMessage, setShowAddedMessage] = useState(false);
+  const [selectedPurchaseType, setSelectedPurchaseType] = useState("regular"); // regular, pre-book, pre-buy
 
   // Fetch product data
   useEffect(() => {
@@ -115,7 +120,7 @@ export default function ProductDetails() {
     }
   }, [showAddedMessage]);
 
-  // Calculate final price based on discount and selected variant
+  // Calculate final price based on discount, selected variant, and purchase type
   const calculateFinalPrice = () => {
     if (!product) return 0;
 
@@ -124,6 +129,17 @@ export default function ProductDetails() {
     // Apply variant price adjustment if a variant is selected
     if (selectedVariant && selectedVariant.priceAdjustment) {
       basePrice += selectedVariant.priceAdjustment;
+    }
+
+    // Apply early access discount for pre-buy option if available
+    if (
+      selectedPurchaseType === "pre-buy" &&
+      product.isPreBuyable &&
+      product.preBuyConfig?.earlyAccessDiscount > 0
+    ) {
+      return (
+        basePrice - basePrice * (product.preBuyConfig.earlyAccessDiscount / 100)
+      );
     }
 
     // Apply discount if available
@@ -159,6 +175,29 @@ export default function ProductDetails() {
 
     const finalPrice = calculateFinalPrice();
 
+    // Check limits based on purchase type
+    if (
+      selectedPurchaseType === "pre-book" &&
+      product.preBookConfig?.limitPerCustomer &&
+      quantity > product.preBookConfig.limitPerCustomer
+    ) {
+      toast.error(
+        `Pre-booking is limited to ${product.preBookConfig.limitPerCustomer} items per customer`
+      );
+      return;
+    }
+
+    if (
+      selectedPurchaseType === "pre-buy" &&
+      product.preBuyConfig?.limitPerCustomer &&
+      quantity > product.preBuyConfig.limitPerCustomer
+    ) {
+      toast.error(
+        `Pre-buying is limited to ${product.preBuyConfig.limitPerCustomer} items per customer`
+      );
+      return;
+    }
+
     const cartItem = {
       id: product._id,
       productId: product._id,
@@ -176,11 +215,18 @@ export default function ProductDetails() {
       shopName: product.shopName,
       variant: selectedVariant ? selectedVariant.name : null,
       variantId: selectedVariant ? selectedVariant._id : null,
+      purchaseType: selectedPurchaseType,
     };
 
     addToCart(cartItem);
     // Show the custom add to cart notification
     setShowAddedMessage(true);
+  };
+
+  // Handle buy now
+  const handleBuyNow = () => {
+    handleAddToCart();
+    router.push("/checkout");
   };
 
   // Generate stars for rating
@@ -339,6 +385,20 @@ export default function ProductDetails() {
                     {product.discountPercentage}% OFF
                   </div>
                 )}
+
+                {/* Special badges */}
+                <div className="absolute top-4 right-4 flex flex-col space-y-2">
+                  {product.isPreBookable && (
+                    <div className="bg-blue-500 text-white text-xs font-bold px-2 py-1 rounded">
+                      Pre-bookable
+                    </div>
+                  )}
+                  {product.isPreBuyable && (
+                    <div className="bg-purple-500 text-white text-xs font-bold px-2 py-1 rounded">
+                      Pre-buy Available
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Thumbnail images */}
@@ -413,6 +473,140 @@ export default function ProductDetails() {
                 </span>
               </div>
 
+              {/* Purchase options */}
+              {(product.isPreBookable || product.isPreBuyable) && (
+                <div className="mb-6">
+                  <h3 className="text-sm font-medium text-gray-900 mb-2">
+                    Purchase Options
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setSelectedPurchaseType("regular")}
+                      className={`px-3 py-1 border rounded-md text-sm ${
+                        selectedPurchaseType === "regular"
+                          ? "border-emerald-500 bg-emerald-50 text-emerald-600"
+                          : "border-gray-300 text-gray-700 hover:border-gray-400"
+                      }`}
+                    >
+                      Regular Purchase
+                    </button>
+
+                    {product.isPreBookable && (
+                      <button
+                        onClick={() => setSelectedPurchaseType("pre-book")}
+                        className={`px-3 py-1 border rounded-md text-sm ${
+                          selectedPurchaseType === "pre-book"
+                            ? "border-blue-500 bg-blue-50 text-blue-600"
+                            : "border-gray-300 text-gray-700 hover:border-gray-400"
+                        }`}
+                      >
+                        Pre-book
+                      </button>
+                    )}
+
+                    {product.isPreBuyable && (
+                      <button
+                        onClick={() => setSelectedPurchaseType("pre-buy")}
+                        className={`px-3 py-1 border rounded-md text-sm ${
+                          selectedPurchaseType === "pre-buy"
+                            ? "border-purple-500 bg-purple-50 text-purple-600"
+                            : "border-gray-300 text-gray-700 hover:border-gray-400"
+                        }`}
+                      >
+                        Pre-buy
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Info for pre-book */}
+                  {selectedPurchaseType === "pre-book" &&
+                    product.isPreBookable && (
+                      <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                        <div className="flex text-sm text-blue-700">
+                          <Calendar className="h-5 w-5 mr-2 flex-shrink-0" />
+                          <div>
+                            <p className="font-medium mb-1">
+                              Pre-book this product
+                            </p>
+                            {product.preBookConfig?.startDate &&
+                              product.preBookConfig?.endDate && (
+                                <p className="text-xs">
+                                  Pre-booking available from{" "}
+                                  {new Date(
+                                    product.preBookConfig.startDate
+                                  ).toLocaleDateString()}{" "}
+                                  to{" "}
+                                  {new Date(
+                                    product.preBookConfig.endDate
+                                  ).toLocaleDateString()}
+                                </p>
+                              )}
+                            {product.preBookConfig?.limitPerCustomer && (
+                              <p className="text-xs">
+                                Limited to{" "}
+                                {product.preBookConfig.limitPerCustomer}{" "}
+                                {product.preBookConfig.limitPerCustomer > 1
+                                  ? "items"
+                                  : "item"}{" "}
+                                per customer
+                              </p>
+                            )}
+                            {product.preBookConfig?.instructions && (
+                              <p className="text-xs mt-1">
+                                {product.preBookConfig.instructions}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                  {/* Info for pre-buy */}
+                  {selectedPurchaseType === "pre-buy" &&
+                    product.isPreBuyable && (
+                      <div className="mt-2 p-3 bg-purple-50 border border-purple-200 rounded-md">
+                        <div className="flex text-sm text-purple-700">
+                          <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
+                          <div>
+                            <p className="font-medium mb-1">
+                              Pre-buy this product
+                            </p>
+                            {product.preBuyConfig?.expectedDeliveryDate && (
+                              <p className="text-xs">
+                                Expected delivery by{" "}
+                                {new Date(
+                                  product.preBuyConfig.expectedDeliveryDate
+                                ).toLocaleDateString()}
+                              </p>
+                            )}
+                            {product.preBuyConfig?.earlyAccessDiscount > 0 && (
+                              <p className="text-xs font-medium">
+                                {product.preBuyConfig.earlyAccessDiscount}% off
+                                regular price!
+                              </p>
+                            )}
+                            {product.preBuyConfig?.limitPerCustomer && (
+                              <p className="text-xs">
+                                Limited to{" "}
+                                {product.preBuyConfig.limitPerCustomer}{" "}
+                                {product.preBuyConfig.limitPerCustomer > 1
+                                  ? "items"
+                                  : "item"}{" "}
+                                per customer
+                              </p>
+                            )}
+                            {product.preBuyConfig?.instructions && (
+                              <p className="text-xs mt-1">
+                                {product.preBuyConfig.instructions}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                </div>
+              )}
+
               {/* Price */}
               <div className="mb-6">
                 <div className="flex items-baseline">
@@ -424,6 +618,13 @@ export default function ProductDetails() {
                       ₹{product.basePrice.toFixed(2)}
                     </span>
                   )}
+                  {selectedPurchaseType === "pre-buy" &&
+                    product.isPreBuyable &&
+                    product.preBuyConfig?.earlyAccessDiscount > 0 && (
+                      <span className="ml-2 px-2 py-1 bg-purple-100 text-purple-800 text-xs font-bold rounded">
+                        PRE-BUY DISCOUNT
+                      </span>
+                    )}
                 </div>
 
                 {product.discountPercentage > 0 && (
@@ -503,7 +704,7 @@ export default function ProductDetails() {
                 </div>
               </div>
 
-              {/* Add to cart button */}
+              {/* Add to cart and Buy now buttons */}
               <div className="flex space-x-4 mb-6">
                 <button
                   onClick={handleAddToCart}
@@ -513,6 +714,15 @@ export default function ProductDetails() {
                   Add to Cart
                 </button>
 
+                <button
+                  onClick={handleBuyNow}
+                  className="flex-grow py-3 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-200 flex items-center justify-center"
+                >
+                  Buy Now
+                </button>
+              </div>
+
+              <div className="flex space-x-4 mb-6">
                 <button
                   className="p-3 border border-gray-300 text-gray-600 rounded-md hover:bg-gray-100 transition duration-200"
                   aria-label="Add to wishlist"
