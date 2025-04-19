@@ -9,6 +9,8 @@ import {
   Clock,
   XCircle,
   ChevronRight,
+  RefreshCw,
+  Store,
 } from "lucide-react";
 
 export default function ShopStatusBanner() {
@@ -51,32 +53,43 @@ export default function ShopStatusBanner() {
     if (mongoUser && mongoUser.role === "retailer") {
       fetchShopStatus();
     }
-  }, [mongoUser]);
+  }, [mongoUser, getIdToken]);
 
   if (isLoading || (!pendingShops.length && !rejectedShops.length)) {
     return null;
   }
 
   return (
-    <div className="mb-6">
+    <div className="space-y-4">
       {pendingShops.length > 0 && (
-        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <Clock className="h-5 w-5 text-yellow-400" />
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 shadow-sm">
+          <div className="flex items-start">
+            <div className="flex-shrink-0 p-2 bg-amber-100 rounded-full">
+              <Clock className="h-5 w-5 text-amber-600" />
             </div>
-            <div className="ml-3">
-              <p className="text-sm text-yellow-700">
-                You have {pendingShops.length} shop
-                {pendingShops.length > 1 ? "s" : ""} pending verification. The
-                admin will review your application soon.
+            <div className="ml-3 flex-1">
+              <div className="flex justify-between">
+                <h3 className="text-sm font-medium text-amber-800">
+                  Shop Verification Pending
+                </h3>
+                <span className="text-xs bg-amber-200 text-amber-800 py-0.5 px-2 rounded-full">
+                  {pendingShops.length}{" "}
+                  {pendingShops.length > 1 ? "shops" : "shop"}
+                </span>
+              </div>
+              <p className="mt-1 text-sm text-amber-700">
+                Your shop {pendingShops.length > 1 ? "s are" : " is"} currently
+                under review. The admin will verify your application soon.
               </p>
-              <div className="mt-2">
+              <div className="mt-2 flex justify-between items-center">
+                <p className="text-xs text-amber-600">
+                  This process typically takes 1-2 business days
+                </p>
                 <Link
                   href="/retailer/shops"
-                  className="text-sm font-medium text-yellow-700 hover:text-yellow-600 flex items-center"
+                  className="text-xs font-medium text-amber-700 hover:text-amber-800 bg-amber-100 hover:bg-amber-200 py-1 px-3 rounded-md flex items-center transition-colors"
                 >
-                  View details <ChevronRight className="h-4 w-4 ml-1" />
+                  View details <ChevronRight className="h-3 w-3 ml-1" />
                 </Link>
               </div>
             </div>
@@ -85,24 +98,38 @@ export default function ShopStatusBanner() {
       )}
 
       {rejectedShops.length > 0 && (
-        <div className="bg-red-50 border-l-4 border-red-400 p-4">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <XCircle className="h-5 w-5 text-red-400" />
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 shadow-sm">
+          <div className="flex items-start">
+            <div className="flex-shrink-0 p-2 bg-red-100 rounded-full">
+              <XCircle className="h-5 w-5 text-red-600" />
             </div>
-            <div className="ml-3">
-              <p className="text-sm text-red-700">
-                You have {rejectedShops.length} shop
-                {rejectedShops.length > 1 ? "s" : ""} that{" "}
-                {rejectedShops.length > 1 ? "were" : "was"} rejected. Please
-                review and resubmit with the correct information.
+            <div className="ml-3 flex-1">
+              <div className="flex justify-between">
+                <h3 className="text-sm font-medium text-red-800">
+                  Shop Verification Rejected
+                </h3>
+                <span className="text-xs bg-red-200 text-red-800 py-0.5 px-2 rounded-full">
+                  {rejectedShops.length}{" "}
+                  {rejectedShops.length > 1 ? "shops" : "shop"}
+                </span>
+              </div>
+              <p className="mt-1 text-sm text-red-700">
+                Your application {rejectedShops.length > 1 ? "were" : "was"} not
+                approved. Please review the feedback and resubmit with the
+                correct information.
               </p>
-              <div className="mt-2">
+              <div className="mt-3 flex items-center justify-between">
                 <Link
                   href="/retailer/shops"
-                  className="text-sm font-medium text-red-700 hover:text-red-600 flex items-center"
+                  className="text-xs font-medium text-red-700 hover:text-red-800 bg-red-100 hover:bg-red-200 py-1 px-3 rounded-md flex items-center transition-colors"
                 >
-                  View details <ChevronRight className="h-4 w-4 ml-1" />
+                  View details <ChevronRight className="h-3 w-3 ml-1" />
+                </Link>
+                <Link
+                  href="/retailer/shops/new"
+                  className="text-xs font-medium text-red-700 hover:text-red-800 bg-red-100 hover:bg-red-200 py-1 px-3 rounded-md flex items-center transition-colors"
+                >
+                  <RefreshCw className="h-3 w-3 mr-1" /> Resubmit application
                 </Link>
               </div>
             </div>
