@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
+import { useAuth } from "@/lib/context/AuthContext";
 import {
   ShoppingBag,
   Search,
@@ -22,11 +23,25 @@ export default function OrderManagement({ shopId }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const router = useRouter();
+  const { getIdToken } = useAuth();
 
   useEffect(() => {
     async function fetchShops() {
       try {
-        const response = await fetch("/api/retailers/shops?verified=true");
+        // Get Firebase token
+        const token = await getIdToken();
+
+        if (!token) {
+          console.error("No authentication token available");
+          toast.error("Authentication error");
+          return;
+        }
+
+        const response = await fetch("/api/retailers/shops?verified=true", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
         if (!response.ok) {
           throw new Error("Failed to fetch shops");
@@ -46,7 +61,7 @@ export default function OrderManagement({ shopId }) {
     }
 
     fetchShops();
-  }, [shopId]);
+  }, [shopId, getIdToken]);
 
   useEffect(() => {
     async function fetchOrders() {
@@ -54,7 +69,19 @@ export default function OrderManagement({ shopId }) {
 
       setIsLoading(true);
       try {
-        const response = await fetch(`/api/shops/${selectedShop}/orders`);
+        // Get Firebase token
+        const token = await getIdToken();
+
+        if (!token) {
+          console.error("No authentication token available");
+          return;
+        }
+
+        const response = await fetch(`/api/shops/${selectedShop}/orders`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
         if (!response.ok) {
           throw new Error("Failed to fetch orders");
@@ -71,7 +98,7 @@ export default function OrderManagement({ shopId }) {
     }
 
     fetchOrders();
-  }, [selectedShop]);
+  }, [selectedShop, getIdToken]);
 
   const handleShopChange = (e) => {
     setSelectedShop(e.target.value);
@@ -103,10 +130,19 @@ export default function OrderManagement({ shopId }) {
 
   const updateOrderStatus = async (orderId, newStatus) => {
     try {
+      // Get Firebase token
+      const token = await getIdToken();
+
+      if (!token) {
+        console.error("No authentication token available");
+        return;
+      }
+
       const response = await fetch(`/api/orders/${orderId}/status`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ status: newStatus }),
       });
@@ -155,9 +191,10 @@ export default function OrderManagement({ shopId }) {
           </span>
         );
       case "canceled":
+      case "cancelled":
         return (
           <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-            Canceled
+            Cancelled
           </span>
         );
       case "refunded":
@@ -176,16 +213,54 @@ export default function OrderManagement({ shopId }) {
       <div className="bg-white p-6 rounded-lg shadow text-center">
         <ShoppingBag className="h-16 w-16 text-gray-400 mx-auto mb-4" />
         <h3 className="text-lg font-medium text-gray-900 mb-2">
+          No Shops Available
+        </h3>
+        <p className="text-gray-600 mb-4">
+          You need to register and get a shop verified to manage orders.
+        </p>
+        <button
+          onClick={() => router.push("/retailer/shops/new")}
+          className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-4 rounded mr-2"
+        >
+          Register New Shop
+        </button>
+        <button
+          onClick={() => router.push("/retailer/shops")}
+          className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded"
+        >
+          View My Shops
+        </button>
+      </div>
+    );
+  }
+
+  // Get verified shops only
+  const verifiedShops = shops.filter(
+    (shop) => shop.verificationStatus === "verified"
+  );
+
+  if (verifiedShops.length === 0) {
+    return (
+      <div className="bg-white p-6 rounded-lg shadow text-center">
+        <ShoppingBag className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-gray-900 mb-2">
           No Verified Shops
         </h3>
         <p className="text-gray-600 mb-4">
-          You need at least one verified shop to manage orders.
+          You have {shops.length} {shops.length === 1 ? "shop" : "shops"}, but{" "}
+          {shops.length === 1 ? "it hasn't" : "none have"} been verified yet.
+          Shop verification is required before you can manage orders.
+        </p>
+        <p className="text-sm text-yellow-600 mb-4">
+          <AlertCircle className="w-4 h-4 inline-block mr-1" />
+          Please wait for an admin to verify your shop(s) or contact support for
+          assistance.
         </p>
         <button
           onClick={() => router.push("/retailer/shops")}
           className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-4 rounded"
         >
-          Go to My Shops
+          View My Shops
         </button>
       </div>
     );
@@ -245,7 +320,7 @@ export default function OrderManagement({ shopId }) {
                   <option value="processing">Processing</option>
                   <option value="ready_for_pickup">Ready for Pickup</option>
                   <option value="completed">Completed</option>
-                  <option value="canceled">Canceled</option>
+                  <option value="cancelled">Cancelled</option>
                   <option value="refunded">Refunded</option>
                 </select>
               </div>
@@ -387,7 +462,7 @@ export default function OrderManagement({ shopId }) {
                         ) && (
                           <button
                             onClick={() =>
-                              updateOrderStatus(order._id, "canceled")
+                              updateOrderStatus(order._id, "cancelled")
                             }
                             className="px-3 py-1 text-xs font-medium text-red-700 bg-red-100 rounded-md hover:bg-red-200 flex items-center"
                           >

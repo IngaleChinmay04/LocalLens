@@ -63,6 +63,41 @@ export async function GET(request, { params }) {
         );
       }
 
+      // Ensure orderStatus has a valid value
+      if (!order.orderStatus) {
+        order.orderStatus = "pending";
+      }
+
+      // Ensure status updates all have valid status values and are consistent with the main orderStatus
+      if (order.statusUpdates && Array.isArray(order.statusUpdates)) {
+        // Make sure all status updates have a valid status
+        order.statusUpdates = order.statusUpdates.map((update) => ({
+          ...update,
+          status: update.status || "pending",
+        }));
+
+        // If there are status updates, make sure the main orderStatus matches the most recent status
+        if (order.statusUpdates.length > 0) {
+          // Sort status updates by timestamp in descending order to get the most recent
+          const sortedUpdates = [...order.statusUpdates].sort(
+            (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
+          );
+
+          // Ensure the main orderStatus matches the most recent status update
+          order.orderStatus = sortedUpdates[0].status;
+        }
+        // If no status updates but we have an orderStatus, add a status update with the current orderStatus
+        else if (order.orderStatus) {
+          order.statusUpdates = [
+            {
+              status: order.orderStatus,
+              timestamp: order.createdAt || new Date(),
+              notes: "Order placed",
+            },
+          ];
+        }
+      }
+
       return NextResponse.json(order);
     } catch (error) {
       console.error("Error fetching order details:", error);
