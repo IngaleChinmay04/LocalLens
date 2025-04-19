@@ -1,17 +1,15 @@
 "use client";
 
 import { useAuth } from "@/lib/context/AuthContext";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import Link from "next/link";
 import RetailerLayout from "@/components/layouts/RetailerLayout";
-import RetailerAnalytics from "@/components/retailers/RetailerAnalytics";
+import RetailerSettings from "@/components/retailers/RetailerSettings";
 
-export default function AnalyticsPage() {
+export default function SettingsPage() {
   const { user, mongoUser, loading } = useAuth();
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const shopId = searchParams.get("shopId");
 
   useEffect(() => {
     if (!loading && (!user || (mongoUser && mongoUser.role !== "retailer"))) {
@@ -45,7 +43,7 @@ export default function AnalyticsPage() {
 
   return (
     <RetailerLayout>
-      <RetailerAnalytics shopId={shopId} />
+      <RetailerSettings />
     </RetailerLayout>
   );
 }

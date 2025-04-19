@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import RetailerDashboard from "@/components/dashboard/RetailerDashboard";
 import RetailerLayout from "@/components/layouts/RetailerLayout";
+import Link from "next/link";
 
 export default function RetailerPage() {
   const { user, mongoUser, loading } = useAuth();
