@@ -5,6 +5,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
+import { useAuth } from "@/lib/context/AuthContext";
+import { auth } from "@/lib/firebase"; // Import Firebase auth directly
 import {
   ShoppingBag,
   ChevronRight,
@@ -17,30 +19,77 @@ import {
 
 export default function OrdersPage() {
   const router = useRouter();
+  const { user, mongoUser } = useAuth();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     async function fetchOrders() {
+      if (!user) {
+        router.push("/signin");
+        return;
+      }
+
       try {
-        const response = await fetch("/api/orders");
+        // Get the Firebase ID token directly from the Firebase auth instance
+        const token = await auth.currentUser.getIdToken(true);
+
+        console.log("Firebase auth token obtained, length:", token.length);
+
+        const response = await fetch("/api/orders", {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            "Cache-Control": "no-cache", // Prevent caching
+          },
+        });
+
+        console.log("API response status:", response.status);
+
         if (!response.ok) {
-          throw new Error("Failed to fetch orders");
+          let errorText;
+          try {
+            const errorData = await response.json();
+            errorText = errorData.error || `Error: ${response.status}`;
+          } catch (e) {
+            errorText =
+              (await response.text()) || `Unknown error: ${response.status}`;
+          }
+
+          console.error("API error:", errorText);
+          throw new Error(errorText);
         }
+
         const data = await response.json();
+        console.log("Orders data received, count:", data?.length || 0);
         setOrders(data);
       } catch (error) {
         console.error("Error fetching orders:", error);
-        setError("Failed to load orders. Please try again later.");
-        toast.error("Failed to load orders");
+        setError(`Failed to load orders: ${error.message}`);
+        toast.error("Failed to load orders. Please try refreshing the page.");
+
+        // Automatically retry once if this might be a token issue
+        if (retryCount === 0) {
+          setRetryCount((prev) => prev + 1);
+          setTimeout(() => {
+            console.log("Retrying fetch after error...");
+            fetchOrders();
+          }, 1000);
+        }
       } finally {
         setLoading(false);
       }
     }
 
-    fetchOrders();
-  }, []);
+    if (user) {
+      fetchOrders();
+    } else {
+      setLoading(false);
+    }
+  }, [user, router, retryCount]);
 
   const getStatusBadge = (status) => {
     switch (status) {

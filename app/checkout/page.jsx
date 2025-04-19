@@ -146,6 +146,9 @@ export default function CheckoutPage() {
     setLoading(true);
 
     try {
+      // Get Firebase ID token
+      const token = await user.getIdToken(true);
+
       // 1. Find the selected address details
       const addressDetails = addresses.find(
         (addr) => addr._id === selectedAddress
@@ -216,11 +219,18 @@ export default function CheckoutPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(orderData),
       });
 
       if (!orderResponse.ok) {
+        const errorData = await orderResponse.text();
+        console.error(
+          "Order creation failed:",
+          orderResponse.status,
+          errorData
+        );
         throw new Error("Failed to create order");
       }
 
@@ -233,6 +243,7 @@ export default function CheckoutPage() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
             amount: orderData.totalAmount * 100, // Razorpay expects amount in paise
@@ -272,6 +283,7 @@ export default function CheckoutPage() {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
                 },
                 body: JSON.stringify({
                   razorpay_order_id: response.razorpay_order_id,

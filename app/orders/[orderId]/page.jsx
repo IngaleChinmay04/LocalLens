@@ -18,12 +18,15 @@ import {
   Phone,
   Mail,
   ArrowRight,
+  AlertCircle,
+  CreditCard,
+  XCircle,
 } from "lucide-react";
 
 export default function OrderDetailsPage() {
   const { orderId } = useParams();
   const router = useRouter();
-  const { user, mongoUser } = useAuth();
+  const { user, authFetch } = useAuth();
 
   const [orderDetails, setOrderDetails] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -31,19 +34,15 @@ export default function OrderDetailsPage() {
 
   useEffect(() => {
     const fetchOrderDetails = async () => {
-      if (!mongoUser?._id) return;
+      if (!user) {
+        router.push("/signin");
+        return;
+      }
 
       try {
         setLoading(true);
-        const response = await fetch(
-          `/api/orders/${orderId}?userId=${mongoUser._id}`
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch order details");
-        }
-
-        const data = await response.json();
+        // Use the authFetch helper to handle authentication
+        const data = await authFetch(`/api/orders/${orderId}`);
         setOrderDetails(data);
       } catch (error) {
         console.error("Error fetching order details:", error);
@@ -54,10 +53,10 @@ export default function OrderDetailsPage() {
       }
     };
 
-    if (mongoUser?._id) {
+    if (user) {
       fetchOrderDetails();
     }
-  }, [orderId, mongoUser]);
+  }, [orderId, user, router, authFetch]);
 
   // Helper to format date
   const formatDate = (dateString) => {
@@ -109,6 +108,11 @@ export default function OrderDetailsPage() {
 
   // Helper to get icon for order status
   const getStatusIcon = (status) => {
+    if (!status) {
+      // Return a default icon if status is undefined or null
+      return <Clock className="h-5 w-5 text-gray-500" />;
+    }
+
     switch (status.toLowerCase()) {
       case "pending":
         return <Clock className="h-5 w-5 text-yellow-500" />;
@@ -211,11 +215,13 @@ export default function OrderDetailsPage() {
             <span className="mx-2 text-gray-300">•</span>
             <span
               className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                orderDetails.orderStatus
+                orderDetails.orderStatus || ""
               )}`}
             >
-              {orderDetails.orderStatus.charAt(0).toUpperCase() +
-                orderDetails.orderStatus.slice(1)}
+              {orderDetails.orderStatus
+                ? orderDetails.orderStatus.charAt(0).toUpperCase() +
+                  orderDetails.orderStatus.slice(1)
+                : "Unknown status"}
             </span>
           </div>
         </div>
@@ -252,8 +258,10 @@ export default function OrderDetailsPage() {
                             <div className="min-w-0 flex-1 pt-1.5 flex justify-between space-x-4">
                               <div>
                                 <p className="text-sm text-gray-900">
-                                  {update.status.charAt(0).toUpperCase() +
-                                    update.status.slice(1)}
+                                  {update.status
+                                    ? update.status.charAt(0).toUpperCase() +
+                                      update.status.slice(1)
+                                    : "Unknown status"}
                                   {update.notes && (
                                     <span className="text-gray-500">
                                       {" "}
@@ -559,8 +567,10 @@ export default function OrderDetailsPage() {
                     <div className="flex items-center">
                       <CreditCard className="h-5 w-5 text-gray-400 mr-2" />
                       <span className="text-sm text-gray-500">
-                        {orderDetails.paymentMethod.charAt(0).toUpperCase() +
-                          orderDetails.paymentMethod.slice(1)}{" "}
+                        {orderDetails.paymentMethod
+                          ? orderDetails.paymentMethod.charAt(0).toUpperCase() +
+                            orderDetails.paymentMethod.slice(1)
+                          : "Online"}{" "}
                         Payment
                       </span>
                     </div>

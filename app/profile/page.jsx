@@ -120,7 +120,7 @@ export default function ProfilePage() {
               <AddressList userId={profile?._id} />
             </Tab.Panel>
             <Tab.Panel className="p-6">
-              <OrderHistory userId={profile?._id} />
+              <OrderHistory />
             </Tab.Panel>
           </Tab.Panels>
         </Tab.Group>

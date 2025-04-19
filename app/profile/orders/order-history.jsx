@@ -4,24 +4,38 @@ import { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
 import Link from "next/link";
 import Image from "next/image";
+import { auth } from "@/lib/firebase";
+import { useAuth } from "@/lib/context/AuthContext";
 
-export default function OrderHistory({ userId }) {
+export default function OrderHistory() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
 
   useEffect(() => {
-    if (userId) {
+    if (user) {
       fetchOrders();
     }
-  }, [userId]);
+  }, [user]);
 
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/orders?userId=${userId}`);
+
+      // Get Firebase ID token
+      const token = await auth.currentUser.getIdToken(true);
+
+      const response = await fetch("/api/orders", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
       if (!response.ok) {
         throw new Error("Failed to fetch orders");
       }
+
       const data = await response.json();
 
       // Enhanced error handling for different response formats

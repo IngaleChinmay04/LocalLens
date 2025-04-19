@@ -5,8 +5,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { Star, ShoppingCart, Heart } from "lucide-react";
 import { useCart } from "@/lib/context/CartContext";
+import { useRouter } from "next/navigation";
 
 export default function ProductCard({ product }) {
+  const router = useRouter();
   const { addToCart } = useCart();
   const [isHovered, setIsHovered] = useState(false);
 
@@ -47,6 +49,20 @@ export default function ProductCard({ product }) {
     // The notification is now handled by CartContext and displayed in CartDrawer
   };
 
+  // Navigate to shop page
+  const navigateToShop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const shopId =
+      typeof product.shopId === "object" ? product.shopId._id : product.shopId;
+    router.push(`/shops/${shopId}`);
+  };
+
+  // Navigate to product page
+  const navigateToProduct = () => {
+    router.push(`/products/${product._id}`);
+  };
+
   // Generate stars based on rating
   const generateStars = (rating) => {
     const stars = [];
@@ -81,9 +97,9 @@ export default function ProductCard({ product }) {
   };
 
   return (
-    <Link
-      href={`/products/${product._id}`}
-      className="block bg-white rounded-lg shadow-md overflow-hidden transition-transform hover:shadow-lg"
+    <div
+      className="block bg-white rounded-lg shadow-md overflow-hidden transition-transform hover:shadow-lg cursor-pointer"
+      onClick={navigateToProduct}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -174,20 +190,15 @@ export default function ProductCard({ product }) {
           </div>
 
           {product.shopName && (
-            <Link
-              href={`/shops/${
-                typeof product.shopId === "object"
-                  ? product.shopId._id
-                  : product.shopId
-              }`}
-              onClick={(e) => e.stopPropagation()}
+            <button
+              onClick={navigateToShop}
               className="text-xs text-gray-500 hover:text-emerald-600"
             >
               {product.shopName}
-            </Link>
+            </button>
           )}
         </div>
       </div>
-    </Link>
+    </div>
   );
 }
