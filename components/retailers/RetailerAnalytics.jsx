@@ -97,19 +97,15 @@ export default function RetailerAnalytics({ shopId }) {
 
         const data = await response.json();
 
-        // Enhance analytics data with additional metrics for visualization
+        // Check if the API already returns these data points before using mock data
         const enhancedData = {
           ...data,
-          // Weekly data for detailed charts (mocked data for demonstration)
-          weeklyData: generateMockWeeklyData(),
-          // Location data (mocked)
-          locationData: generateMockLocationData(),
-          // Customer demographics (mocked)
-          demographics: generateMockDemographics(),
-          // Hourly sales performance (mocked)
-          hourlyPerformance: generateMockHourlyPerformance(),
-          // Product performance metrics (mocked)
-          productMetrics: generateMockProductMetrics(data.topProducts),
+          // Use API data if available, otherwise use mock data
+          weeklyData: data.weeklyData || generateMockWeeklyData(),
+          locationData: data.locationData || generateMockLocationData(),
+          demographics: data.demographics || generateMockDemographics(),
+          hourlyPerformance: data.hourlyPerformance || generateMockHourlyPerformance(),
+          productMetrics: data.productMetrics || generateMockProductMetrics(data.topProducts),
         };
 
         setAnalytics(enhancedData);
@@ -615,126 +611,6 @@ export default function RetailerAnalytics({ shopId }) {
                             className="w-full max-w-[8px] bg-blue-500 rounded-t-sm mx-auto cursor-pointer hover:bg-blue-600"
                             style={{ height: `${(hour.orders / 20) * 100}%` }}
                           >
-                            <div className="hidden group-hover:block absolute bottom-full mb-2 bg-gray-800 text-white text-xs p-2 rounded whitespace-nowrap left-1/2 transform -translate-x-1/2">
-                              {hour.hour}:00 - {hour.orders} orders (₹
-                              {hour.revenue})
-                            </div>
-                          </div>
-                          {index % 4 === 0 && (
-                            <div className="text-xs mt-2 text-gray-500 absolute -bottom-6">
-                              {hour.hour}:00
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Sales by Category */}
-                <div className="bg-white rounded-lg shadow p-5">
-                  <h3 className="text-lg font-medium mb-4">
-                    Sales by Category
-                  </h3>
-                  {analytics.categoryBreakdown.length === 0 ? (
-                    <p className="text-gray-500 text-center py-6">
-                      No category sales data available
-                    </p>
-                  ) : (
-                    <div className="space-y-4">
-                      {analytics.categoryBreakdown.map((category, index) => (
-                        <div key={index}>
-                          <div className="flex justify-between items-center mb-1">
-                            <p className="text-sm font-medium text-gray-900">
-                              {category.name}
-                            </p>
-                            <p className="text-sm font-medium text-gray-900">
-                              {formatCurrency(category.revenue)}
-                            </p>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2.5">
-                            <div
-                              className="h-2.5 rounded-full"
-                              style={{
-                                width: `${category.percentOfTotal}%`,
-                                backgroundColor: category.color || "#10b981",
-                              }}
-                            ></div>
-                          </div>
-                          <div className="flex justify-between text-xs text-gray-500 mt-1">
-                            <span>{category.percentOfTotal}%</span>
-                            <span>{category.orderCount} orders</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white rounded-lg shadow p-5">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-medium">Sales Funnel</h3>
-                    <div className="text-sm text-gray-500">
-                      {getTimeRangeLabel()}
-                    </div>
-                  </div>
-                  <div className="space-y-4">
-                    <div className="relative pt-1">
-                      <p className="flex justify-between items-center mb-1">
-                        <span className="text-sm font-medium text-gray-700">
-                          Visits
-                        </span>
-                        <span className="text-sm font-bold text-gray-900">
-                          1,245
-                        </span>
-                      </p>
-                      <div className="overflow-hidden h-6 text-xs flex rounded bg-emerald-200">
-                        <div
-                          style={{ width: "100%" }}
-                          className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-emerald-500"
-                        >
-                          100%
-                        </div>
-                      </div>
-                    </div>
-                    <div className="relative pt-1">
-                      <p className="flex justify-between items-center mb-1">
-                        <span className="text-sm font-medium text-gray-700">
-                          Product Views
-                        </span>
-                        <span className="text-sm font-bold text-gray-900">
-                          876
-                        </span>
-                      </p>
-                      <div className="overflow-hidden h-6 text-xs flex rounded bg-emerald-200">
-                        <div
-                          style={{ width: "70%" }}
-                          className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-emerald-500"
-                        >
-                          70%
-                        </div>
-                      </div>
-                    </div>
-                    <div className="relative pt-1">
-                      <p className="flex justify-between items-center mb-1">
-                        <span className="text-sm font-medium text-gray-700">
-                          Add to Cart
-                        </span>
-                        <span className="text-sm font-bold text-gray-900">
-                          432
-                        </span>
-                      </p>
-                      <div className="overflow-hidden h-6 text-xs flex rounded bg-emerald-200">
-                        <div
-                          style={{ width: "35%" }}
-                          className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-emerald-500"
-                        >
-                          35%
-                        </div>
-                      </div>
-                    </div>
                     <div className="relative pt-1">
                       <p className="flex justify-between items-center mb-1">
                         <span className="text-sm font-medium text-gray-700">

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { BarChart2 } from "lucide-react";
 
 export default function AdminSidebar({ user }) {
   const [showSidebar, setShowSidebar] = useState(false);
@@ -29,6 +30,11 @@ export default function AdminSidebar({ user }) {
       ),
       label: "Dashboard",
       link: "/admin",
+    },
+    {
+      icon: <BarChart2 className="w-5 h-5" />,
+      label: "Analytics",
+      link: "/admin/analytics",
     },
     {
       icon: (
