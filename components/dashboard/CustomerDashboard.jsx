@@ -457,15 +457,35 @@ export default function CustomerDashboard() {
           <div className="relative h-64 rounded-xl overflow-hidden">
             {banners.length > 0 && (
               <>
-                <div
-                  className={`absolute inset-0 bg-gradient-to-r ${banners[currentBannerIndex].backgroundColor} opacity-80 transition-opacity duration-500`}
-                ></div>
+                {/* Background image or gradient */}
+                {banners[currentBannerIndex].image ? (
+                  <div className="absolute inset-0">
+                    <Image
+                      src={banners[currentBannerIndex].image}
+                      alt={banners[currentBannerIndex].title}
+                      fill
+                      priority
+                      className="object-cover"
+                    />
+                    {/* Light overlay for text readability, using a gradient instead of solid black */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-black/20 to-transparent"></div>
+                  </div>
+                ) : (
+                  <div
+                    className={`absolute inset-0 bg-gradient-to-r ${
+                      banners[currentBannerIndex].backgroundColor ||
+                      "from-emerald-600 to-teal-500"
+                    } transition-opacity duration-500`}
+                  ></div>
+                )}
+
+                {/* Banner content */}
                 <div className="absolute inset-0 flex items-center">
                   <div className="container mx-auto px-4 md:px-10">
-                    <h2 className="text-3xl font-bold text-white mb-2">
+                    <h2 className="text-3xl font-bold text-white mb-2 drop-shadow-md">
                       {banners[currentBannerIndex].title}
                     </h2>
-                    <p className="text-white mb-4 max-w-md">
+                    <p className="text-white mb-4 max-w-md drop-shadow-md">
                       {banners[currentBannerIndex].description}
                     </p>
                     <Link
@@ -476,6 +496,7 @@ export default function CustomerDashboard() {
                     </Link>
                   </div>
                 </div>
+
                 {/* Banner pagination dots */}
                 <div className="absolute bottom-4 left-0 right-0 flex justify-center space-x-2">
                   {banners.map((_, index) => (

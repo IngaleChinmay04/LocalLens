@@ -52,12 +52,19 @@ export default function AdminSidebar({ user }) {
     },
     {
       icon: (
-        <svg className="w-5 h-5" viewBox="0 0 18 20" fill="currentColor">
-          <path d="M17 5.923A1 1 0 0 0 16 5h-3V4a4 4 0 1 0-8 0v1H2a1 1 0 0 0-1 .923L.086 17.846A2 2 0 0 0 2.08 20h13.84a2 2 0 0 0 1.994-2.153L17 5.923ZM7 9a1 1 0 0 1-2 0V7h2v2Zm0-5a2 2 0 1 1 4 0v1H7V4Zm6 5a1 1 0 1 1-2 0V7h2v2Z" />
+        <svg
+          className="w-5 h-5"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <path d="M4 7V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2" />
+          <path d="M18.5 14c.8 0 1.5-.7 1.5-1.5v-5c0-.8-.7-1.5-1.5-1.5h-13C4.7 6 4 6.7 4 7.5v5c0 .8.7 1.5 1.5 1.5H9l3 3 3-3h3.5z" />
         </svg>
       ),
-      label: "Products",
-      link: "/admin/products",
+      label: "Banners",
+      link: "/admin/banners",
     },
   ];
 
