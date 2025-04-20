@@ -61,7 +61,9 @@ export default function AdminShopsPage() {
             <p className="text-gray-600">Verify and manage retailer shops</p>
           </div>
 
+          {/* Manual shop verification component temporarily disabled
           <ManualShopVerify />
+          */}
 
           <ShopVerificationList />
         </div>
