@@ -332,18 +332,14 @@ export default function ShopDetailsPage() {
               </div>
             )}
 
-            {/* Status Badge */}
-            <div className="absolute bottom-4 right-4">
-              <div
-                className={`rounded-full px-3 py-1 text-xs font-medium ${
-                  isShopCurrentlyOpen()
-                    ? "bg-green-100 text-green-800"
-                    : "bg-red-100 text-red-800"
-                }`}
-              >
-                {isShopCurrentlyOpen() ? "Open Now" : "Closed"}
-              </div>
-            </div>
+            {/* Status Badge - Only show "Open Now" when shop is open */}
+            {/* <div className="absolute bottom-4 right-4">
+              {isShopCurrentlyOpen() && (
+                <div className="rounded-full px-3 py-1 text-xs font-medium bg-green-100 text-green-800">
+                  Open Now
+                </div>
+              )}
+            </div> */}
           </div>
 
           <div className="p-6">
