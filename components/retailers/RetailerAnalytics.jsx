@@ -104,8 +104,10 @@ export default function RetailerAnalytics({ shopId }) {
           weeklyData: data.weeklyData || generateMockWeeklyData(),
           locationData: data.locationData || generateMockLocationData(),
           demographics: data.demographics || generateMockDemographics(),
-          hourlyPerformance: data.hourlyPerformance || generateMockHourlyPerformance(),
-          productMetrics: data.productMetrics || generateMockProductMetrics(data.topProducts),
+          hourlyPerformance:
+            data.hourlyPerformance || generateMockHourlyPerformance(),
+          productMetrics:
+            data.productMetrics || generateMockProductMetrics(data.topProducts),
         };
 
         setAnalytics(enhancedData);
@@ -610,41 +612,51 @@ export default function RetailerAnalytics({ shopId }) {
                           <div
                             className="w-full max-w-[8px] bg-blue-500 rounded-t-sm mx-auto cursor-pointer hover:bg-blue-600"
                             style={{ height: `${(hour.orders / 20) * 100}%` }}
-                          >
-                    <div className="relative pt-1">
-                      <p className="flex justify-between items-center mb-1">
-                        <span className="text-sm font-medium text-gray-700">
-                          Checkout Started
-                        </span>
-                        <span className="text-sm font-bold text-gray-900">
-                          198
-                        </span>
-                      </p>
-                      <div className="overflow-hidden h-6 text-xs flex rounded bg-emerald-200">
-                        <div
-                          style={{ width: "16%" }}
-                          className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-emerald-500"
-                        >
-                          16%
+                          ></div>
+                          <div className="text-xs mt-2">{hour.hour}:00</div>
                         </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-lg shadow p-5">
+                  <h3 className="text-lg font-medium mb-4">
+                    Order Status Breakdown
+                  </h3>
+                  <div className="relative pt-1">
+                    <p className="flex justify-between items-center mb-1">
+                      <span className="text-sm font-medium text-gray-700">
+                        Checkout Started
+                      </span>
+                      <span className="text-sm font-bold text-gray-900">
+                        198
+                      </span>
+                    </p>
+                    <div className="overflow-hidden h-6 text-xs flex rounded bg-emerald-200">
+                      <div
+                        style={{ width: "16%" }}
+                        className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-emerald-500"
+                      >
+                        16%
                       </div>
                     </div>
-                    <div className="relative pt-1">
-                      <p className="flex justify-between items-center mb-1">
-                        <span className="text-sm font-medium text-gray-700">
-                          Purchases
-                        </span>
-                        <span className="text-sm font-bold text-gray-900">
-                          {analytics.orders.total}
-                        </span>
-                      </p>
-                      <div className="overflow-hidden h-6 text-xs flex rounded bg-emerald-200">
-                        <div
-                          style={{ width: "12%" }}
-                          className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-emerald-500"
-                        >
-                          12%
-                        </div>
+                  </div>
+                  <div className="relative pt-1">
+                    <p className="flex justify-between items-center mb-1">
+                      <span className="text-sm font-medium text-gray-700">
+                        Purchases
+                      </span>
+                      <span className="text-sm font-bold text-gray-900">
+                        {analytics.orders.total}
+                      </span>
+                    </p>
+                    <div className="overflow-hidden h-6 text-xs flex rounded bg-emerald-200">
+                      <div
+                        style={{ width: "12%" }}
+                        className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-emerald-500"
+                      >
+                        12%
                       </div>
                     </div>
                   </div>
