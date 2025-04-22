@@ -71,7 +71,7 @@ export default function Navbar() {
                     )}
                   </div>
                   <ul className="py-2" aria-labelledby="user-menu-button">
-                    <li>
+                    {/* <li>
                       <Link
                         href="/dashboard"
                         className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
@@ -79,7 +79,7 @@ export default function Navbar() {
                       >
                         Dashboard
                       </Link>
-                    </li>
+                    </li> */}
                     <li>
                       <Link
                         href="/profile"
