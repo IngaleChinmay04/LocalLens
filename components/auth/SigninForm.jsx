@@ -99,7 +99,7 @@ export default function SignInForm() {
         className="w-full flex items-center justify-center bg-white border border-gray-300 rounded-lg shadow-md px-6 py-2 text-sm font-medium text-gray-800 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 mb-4"
       >
         <Image
-          src="/google-icon.svg"
+          src="/google.png"
           width={20}
           height={20}
           alt="Google"
