@@ -185,7 +185,7 @@ export default function Navbar() {
             </li>
             <li>
               <Link
-                href="/shops"
+                href="/#shop"
                 className="block py-2 px-3 text-gray-900 rounded hover:bg-gray-100 md:hover:bg-transparent md:hover:text-emerald-600 md:p-0"
                 onClick={() => setIsMenuOpen(false)}
               >
@@ -194,7 +194,7 @@ export default function Navbar() {
             </li>
             <li>
               <Link
-                href="/products"
+                href="/#trending"
                 className="block py-2 px-3 text-gray-900 rounded hover:bg-gray-100 md:hover:bg-transparent md:hover:text-emerald-600 md:p-0"
                 onClick={() => setIsMenuOpen(false)}
               >

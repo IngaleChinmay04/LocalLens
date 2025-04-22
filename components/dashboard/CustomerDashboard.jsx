@@ -555,7 +555,7 @@ export default function CustomerDashboard() {
       </div>
 
       {/* Nearby shops section */}
-      <div className="mb-8">
+      <div className="mb-8" id="shop">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">Shops Near You</h2>
           <Link
@@ -642,7 +642,7 @@ export default function CustomerDashboard() {
       </div>
 
       {/* Trending products section */}
-      <div className="mb-8">
+      <div id="trending" className="mb-8">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">Trending Now</h2>
           <Link
